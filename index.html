@@ -249,6 +249,9 @@
     .btn-delete-sol { background: #e11d2e; color: #fff; border: 0; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; transition: opacity .15s; display: inline-flex; align-items: center; gap: 4px; }
     .btn-delete-sol:hover { opacity: 0.9; }
     .foot { text-align: center; font-size: 12px; color: #6b8094; padding: 16px 0; }
+    #tablaCuerpo tr.fila-error input.sku, #tablaCuerpo tr.fila-error input.cantidad, #tablaCuerpo tr.fila-error input.origen { border-color:#dc2626 !important; background:#fef2f2 !important; }
+    #errMultiplos { display:none; margin:0 0 10px; padding:10px 12px; border:1px solid #fca5a5; background:#fef2f2; color:#991b1b; border-radius:8px; font-size:12px; font-weight:600; line-height:1.5; }
+    #errMultiplos ul { margin:6px 0 0 18px; padding:0; list-style:disc; font-weight:500; }
   </style>
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#1cbcec">
@@ -570,7 +573,30 @@
       "35420": "25582", "15484": "25559", "5434": "25432", "5403": "25404", "15466": "25541",
       "5431": "25429", "15480": "25555", "15460": "25532", "5446": "25441", "5472": "25460",
       "5459": "25450", "5479": "25467", "5405": "25406", "5404": "25405", "15412": "25481",
-      "5428": "25426", "5414": "25414", "15446": "25516", "5436": "25433", "15475": "25550"
+      "5428": "25426", "5414": "25414", "15446": "25516", "5436": "25433", "15475": "25550",
+      "15453": "25520", "5411": "25411", "5433": "25431", "5493": "25468", "15452": "25519",
+      "5406": "25407", "5427": "25425", "15454": "25521", "5473": "25461", "35405": "25567",
+      "5439": "25435", "15482": "25557", "15457": "25528", "5417": "25417", "5474": "25462",
+      "15456": "25527", "5438": "25434", "15472": "25547", "5468": "25457", "5424": "25423",
+      "35431": "25593", "5466": "25455", "5421": "25420", "15448": "25517", "35427": "25589",
+      "15463": "25538", "5441": "25437", "15468": "25543", "5415": "25415", "5456": "25447",
+      "35428": "25590", "35409": "25571", "5409": "25409", "15432": "25502", "5416": "25416",
+      "5432": "25430", "5475": "25463", "5426": "25424", "5452": "25446", "15413": "25482",
+      "5467": "25456", "5448": "25443", "15483": "25558", "5469": "25458", "5465": "25454",
+      "15497": "25469", "5429": "25427", "35430": "25592", "15406": "25475", "15467": "25542",
+      "15410": "25479", "5440": "25436", "5457": "25448", "15461": "25536", "5445": "25440",
+      "5463": "25452", "5423": "25422", "35434": "25596", "35435": "25597", "35436": "25598",
+      "5444": "25439", "5449": "25444", "5464": "25453", "5470": "25459", "5476": "25464",
+      "5477": "25465", "5478": "25466", "15403": "25472", "15419": "25489", "15423": "25493",
+      "15424": "25494", "15425": "25495", "15427": "25497", "15428": "25498", "15429": "25499",
+      "15430": "25500", "15433": "25503", "15437": "25507", "15438": "25508", "15440": "25510",
+      "15470": "25545", "15471": "25546", "15477": "25552", "15485": "25560", "15486": "25561",
+      "15487": "25562", "35401": "25563", "35402": "25564", "35403": "25565", "35404": "25566",
+      "35407": "25569", "35408": "25570", "35410": "25572", "35411": "25573", "35412": "25574",
+      "35413": "25575", "35414": "25576", "35415": "25577", "35416": "25578", "35417": "25579",
+      "35418": "25580", "35421": "25583", "35424": "25586", "5447": "25442", "35425": "25587",
+      "35423": "25585", "15411": "25480", "35422": "25584", "35426": "25588", "35429": "25591",
+      "35433": "25595"
     };
     function convertirSuc(val) { return SUC_TO_TRAN[String(val || '').trim().toUpperCase()] || String(val || '').trim().toUpperCase(); }
 
@@ -825,12 +851,70 @@
       if (tab === 'dashboard') cargarDashboard();
     }
 
+
+    // ===== Validación de múltiplos de distribución (tabla maestro_multiplos) =====
+    const ORIGEN_COL = { '05499': 'multiplo_scz', '15497': 'multiplo_lpz' };
+    let maestroMultiplos = null;       // Map id_producto -> {multiplo_scz, multiplo_lpz}
+    let maestroPromesa = null;
+    function normOrigen(v) { const s = String(v || '').trim().toUpperCase(); return /^\d+$/.test(s) ? s.padStart(5, '0') : s; }
+    function asegurarMaestro() {
+      if (maestroMultiplos) return Promise.resolve(maestroMultiplos);
+      if (maestroPromesa) return maestroPromesa;
+      maestroPromesa = (async () => {
+        const mapa = new Map(); const PAG = 1000;
+        for (let desde = 0; ; desde += PAG) {
+          const { data, error } = await sb.from('maestro_multiplos')
+            .select('id_producto,multiplo_scz,multiplo_lpz').order('id_producto').range(desde, desde + PAG - 1);
+          if (error) throw error;
+          data.forEach(r => mapa.set(String(r.id_producto), r));
+          if (data.length < PAG) break;
+        }
+        maestroMultiplos = mapa; return mapa;
+      })().catch(err => { maestroPromesa = null; throw err; });
+      return maestroPromesa;
+    }
+    function errorFila(origen, sku, cantidad) {
+      const col = ORIGEN_COL[normOrigen(origen)];
+      if (!col || !sku) return '';
+      const reg = maestroMultiplos.get(String(sku).trim());
+      if (!reg) return 'SKU ' + sku + ': no existe en el maestro de múltiplos';
+      const m = reg[col];
+      const c = Number(cantidad);
+      if (!m) return '';
+      if (!Number.isFinite(c) || c <= 0 || c % m !== 0) return 'SKU ' + sku + ': cantidad ' + (cantidad === '' ? '(vacía)' : cantidad) + ' debe ser múltiplo de ' + m;
+      return '';
+    }
+    function validarMultiplos() {
+      const caja = $('errMultiplos'); if (!caja) return [];
+      if (!maestroMultiplos) return [];
+      const errores = [];
+      document.querySelectorAll('#tablaCuerpo .fila-tarea').forEach((tr, i) => {
+        tr.classList.remove('fila-error'); tr.title = '';
+        if (filaVacia(tr)) return;
+        const msg = errorFila(tr.querySelector('.origen').value, tr.querySelector('.sku').value.trim().toUpperCase(), tr.querySelector('.cantidad').value);
+        if (msg) { tr.classList.add('fila-error'); tr.title = msg; errores.push('Fila ' + (i + 1) + ' · ' + msg); }
+      });
+      if (errores.length) {
+        const lista = errores.slice(0, 15).map(e => '<li>' + esc(e) + '</li>').join('');
+        const mas = errores.length > 15 ? '<li>… y ' + (errores.length - 15) + ' más</li>' : '';
+        caja.innerHTML = '⚠ ' + errores.length + (errores.length === 1 ? ' fila no cumple' : ' filas no cumplen') + ' la unidad de distribución. Corrígelas para poder enviar.<ul>' + lista + mas + '</ul>';
+        caja.style.display = 'block';
+      } else { caja.style.display = 'none'; caja.innerHTML = ''; }
+      return errores;
+    }
+    let validarTimer = null;
+    function programarValidacion() {
+      clearTimeout(validarTimer);
+      validarTimer = setTimeout(() => { asegurarMaestro().then(validarMultiplos).catch(() => {}); }, 200);
+    }
+
     function filaVacia(tr) { return ['origen', 'destino', 'sku', 'cantidad'].every(c => !tr.querySelector('.' + c).value.trim()); }
     function renumerar() {
       const filas = document.querySelectorAll('#tablaCuerpo .fila-tarea');
       filas.forEach((tr, i) => { tr.querySelector('.num').textContent = i + 1; });
       $('contadorFilas').textContent = filas.length + (filas.length === 1 ? ' fila' : ' filas');
       actualizarResumen();
+      programarValidacion();
     }
     function actualizarResumen() {
       let filas = 0, unidades = 0; const cont = new Map();
@@ -929,6 +1013,18 @@
         });
       });
       if (!datos.length) { alert('Agrega al menos una fila con datos.'); return; }
+      try { await asegurarMaestro(); }
+      catch (err) {
+        msg.textContent = 'No se pudo cargar el maestro de múltiplos. Recarga la página e inténtalo de nuevo.';
+        msg.className = 'p-3 rounded text-sm text-center font-semibold bg-red-100 text-red-700 block'; return;
+      }
+      const errs = validarMultiplos();
+      if (errs.length) {
+        msg.textContent = 'No se puede enviar: ' + errs.length + (errs.length === 1 ? ' fila no cumple' : ' filas no cumplen') + ' el múltiplo de distribución.';
+        msg.className = 'p-3 rounded text-sm text-center font-semibold bg-red-100 text-red-700 block';
+        const primera = document.querySelector('#tablaCuerpo .fila-error'); if (primera) primera.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
       btn.disabled = true; btn.textContent = 'Enviando...';
       try {
         const nro = await DB.siguienteNro();
@@ -1338,7 +1434,15 @@
       document.addEventListener('click', () => $('notifPanel').classList.add('hidden'));
       document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('notifPanel').classList.add('hidden'); });
       document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => cambiarTab(btn.dataset.tab)));
+      (function () {
+        const tabla = $('tablaCuerpo').closest('table');
+        const caja = document.createElement('div'); caja.id = 'errMultiplos';
+        tabla.parentNode.insertBefore(caja, tabla);
+        $('tablaCuerpo').addEventListener('input', programarValidacion);
+        $('tablaCuerpo').addEventListener('change', programarValidacion);
+      })();
       agregarFilaTabla();
+      asegurarMaestro().catch(() => {});
       
       $('btnCargarFilas').addEventListener('click', procesarTextoPegado);
       $('btnAgregarFila').addEventListener('click', () => agregarFilaTabla());
