@@ -639,11 +639,12 @@
     const ESTADOS = ['PENDIENTE', 'APROBADO', 'RECHAZADO', 'CARGADO', 'CARGADO CON OBS', 'ELIMINADO'];
 
     // ---- Permisos ----
-    // Único usuario que puede aprobar/rechazar (también se valida en Supabase con un trigger)
-    const EMAIL_APROBADOR = 'yvillarroel@farmaciaschavez.com.bo';
+    // Únicos usuarios que pueden aprobar/rechazar (también se valida en Supabase con un trigger).
+    // Estos usuarios NO pueden cargar, cargar con obs ni eliminar, aunque su rol en perfiles sea cedis/admin.
+    const EMAILS_APROBADORES = ['yvillarroel@farmaciaschavez.com.bo', 'lcoca@farmaciaschavez.com.bo'];
     const esCargado = (e) => e === 'CARGADO' || e === 'CARGADO CON OBS';
-    const esAprobador = () => !!(usuarioActual && String(usuarioActual.email || '').trim().toLowerCase() === EMAIL_APROBADOR);
-    const esCedisAdmin = () => rolActual === 'cedis' || rolActual === 'admin';
+    const esAprobador = () => !!(usuarioActual && EMAILS_APROBADORES.includes(String(usuarioActual.email || '').trim().toLowerCase()));
+    const esCedisAdmin = () => !esAprobador() && (rolActual === 'cedis' || rolActual === 'admin');
     const puedeGestionar = () => esAprobador() || esCedisAdmin();
 
     // Estados que el usuario actual puede asignar a una solicitud (siempre incluye el actual)
@@ -1201,7 +1202,7 @@
     }
 
     function esDuenoPendiente(g) {
-      return !!(usuarioActual && g.user_id && g.user_id === usuarioActual.id
+      return !!(usuarioActual && !esAprobador() && g.user_id && g.user_id === usuarioActual.id
         && g.items.every(i => i.estado === 'PENDIENTE'));
     }
 
@@ -1353,7 +1354,7 @@
       if (!estadosPermitidos(g).includes(estado)) {
         alert(esCargado(estado)
           ? 'Solo CEDIS/Admin pueden cargar, y únicamente solicitudes APROBADAS.'
-          : 'Solo ' + EMAIL_APROBADOR + ' puede aprobar o rechazar solicitudes.');
+          : 'Solo ' + EMAILS_APROBADORES.join(' o ') + ' pueden aprobar o rechazar solicitudes.');
         await cargarSolicitudesCedis();
         return;
       }
