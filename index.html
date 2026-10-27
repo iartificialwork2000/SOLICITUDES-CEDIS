@@ -252,6 +252,32 @@
     #tablaCuerpo tr.fila-error input.sku, #tablaCuerpo tr.fila-error input.cantidad, #tablaCuerpo tr.fila-error input.origen { border-color:#dc2626 !important; background:#fef2f2 !important; }
     #errMultiplos { display:none; margin:0 0 10px; padding:10px 12px; border:1px solid #fca5a5; background:#fef2f2; color:#991b1b; border-radius:8px; font-size:12px; font-weight:600; line-height:1.5; }
     #errMultiplos ul { margin:6px 0 0 18px; padding:0; list-style:disc; font-weight:500; }
+
+    /* ---- Notificaciones llamativas ---- */
+    .btn-bell.tiene-nuevas { background: #ff9f0a; color: #fff; box-shadow: 0 0 0 0 rgba(255, 159, 10, .8); animation: bell-pulso 1.6s ease-out infinite; }
+    .btn-bell.tiene-nuevas:hover { background: #ff8c00; }
+    @keyframes bell-pulso { 0% { box-shadow: 0 0 0 0 rgba(255, 159, 10, .85); } 70% { box-shadow: 0 0 0 12px rgba(255, 159, 10, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 159, 10, 0); } }
+    .notif-badge { background: #ff1744 !important; min-width: 19px !important; height: 19px !important; line-height: 19px !important; font-size: 11px !important; border-color: #fff !important; box-shadow: 0 2px 8px rgba(255, 23, 68, .7); animation: badge-latido 1.2s ease-in-out infinite; }
+    @keyframes badge-latido { 0%,100% { transform: scale(1); } 50% { transform: scale(1.22); } }
+    .notif-item.no-leida { background: #fff4d6 !important; border-left: 5px solid #ff9f0a; font-weight: 800; }
+    .notif-item.no-leida:hover { background: #ffe9ad !important; }
+    .notif-item.no-leida .dot { background: #ff1744 !important; width: 10px; height: 10px; }
+    #notifToasts { position: fixed; top: 74px; right: 16px; z-index: 90; display: flex; flex-direction: column; gap: 10px; width: 360px; max-width: calc(100vw - 32px); pointer-events: none; }
+    #notifToasts .notif-toast { position: relative; right: auto; bottom: auto; max-width: none; pointer-events: auto; display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border-radius: 14px; border: 2px solid #fff; background: linear-gradient(135deg, #ff9f0a 0%, #ff5e3a 100%); color: #fff; font-size: 14.5px; font-weight: 800; line-height: 1.35; box-shadow: 0 16px 36px -8px rgba(255, 94, 58, .75), 0 0 0 4px rgba(255, 159, 10, .35); animation: toast-entra .45s cubic-bezier(.2, 1.3, .4, 1) both, toast-brillo 1.4s ease-in-out .45s 3; cursor: pointer; }
+    .notif-toast .t-ico { flex: none; font-size: 26px; line-height: 1; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .3)); }
+    .notif-toast .t-body small { display: block; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; opacity: .9; margin-bottom: 2px; }
+    .notif-toast .t-x { flex: none; margin-left: auto; background: rgba(0, 0, 0, .18); border: 0; color: #fff; width: 22px; height: 22px; border-radius: 50%; font-size: 14px; line-height: 1; cursor: pointer; }
+    .notif-toast.sale { animation: toast-sale .3s ease forwards; }
+    @keyframes toast-entra { from { opacity: 0; transform: translateX(120%) scale(.9); } to { opacity: 1; transform: translateX(0) scale(1); } }
+    @keyframes toast-sale { to { opacity: 0; transform: translateX(120%); } }
+    @keyframes toast-brillo { 0%,100% { box-shadow: 0 16px 36px -8px rgba(255, 94, 58, .75), 0 0 0 4px rgba(255, 159, 10, .35); } 50% { box-shadow: 0 16px 40px -6px rgba(255, 94, 58, .95), 0 0 0 9px rgba(255, 159, 10, .15); } }
+    .notif-sonido { background: none; border: 0; font-size: 11.5px; font-weight: 700; color: var(--blue); cursor: pointer; padding: 0; }
+    .banner-filtro { display: none; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border-radius: 10px; background: #fff4d6; border: 1px solid #ffc857; border-left: 5px solid #ff9f0a; color: #7a4a00; font-size: 13px; font-weight: 700; }
+    .banner-filtro button { background: #ff9f0a; color: #fff; border: 0; border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 800; cursor: pointer; }
+    .banner-filtro button:hover { background: #ff8c00; }
+    tr.grp-head.resaltada td { animation: resalta 2.2s ease 1; }
+    @keyframes resalta { 0%,60% { background: #ffe9ad; } 100% { background: transparent; } }
+    @media (max-width: 640px) { #notifToasts { top: 64px; right: 8px; left: 8px; width: auto; max-width: none; } }
   </style>
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#1cbcec">
@@ -358,7 +384,7 @@
                 <span id="notifBadge" class="notif-badge hidden">0</span>
               </button>
               <div id="notifPanel" class="notif-panel hidden">
-                <div class="notif-head"><span>Notificaciones</span><button type="button" id="btnNotifTodas">Marcar todas como leídas</button></div>
+                <div class="notif-head"><span>Notificaciones</span><span style="display:flex;gap:12px;align-items:center"><button type="button" id="btnNotifSonido" class="notif-sonido" title="Activar o silenciar el sonido">🔊 Sonido</button><button type="button" id="btnNotifTodas">Marcar todas como leídas</button></span></div>
                 <div id="notifList" class="notif-list"><div class="notif-vacio">Cargando…</div></div>
               </div>
             </div>
@@ -560,7 +586,7 @@
         </div>
       </section>
     </main>
-    <footer class="foot">Registro de Solicitudes· CEDIS SCZ - LPZ (Desarrolado por Ivan Callau con apoyo del equipo cedis)</footer>
+    <footer class="foot">Registro de Solicitudes· CEDIS La Paz(DESARROLADO POR EL EQUIPO CEIDS)</footer>
   </div>
 
   <script>
@@ -583,7 +609,7 @@
       "35428": "25590", "35409": "25571", "5409": "25409", "15432": "25502", "5416": "25416",
       "5432": "25430", "5475": "25463", "5426": "25424", "5452": "25446", "15413": "25482",
       "5467": "25456", "5448": "25443", "15483": "25558", "5469": "25458", "5465": "25454",
-      "15497": "15497", "5429": "25427", "35430": "25592", "15406": "25475", "15467": "25542",
+      "15497": "25469", "5429": "25427", "35430": "25592", "15406": "25475", "15467": "25542",
       "15410": "25479", "5440": "25436", "5457": "25448", "15461": "25536", "5445": "25440",
       "5463": "25452", "5423": "25422", "35434": "25596", "35435": "25597", "35436": "25598",
       "5444": "25439", "5449": "25444", "5464": "25453", "5470": "25459", "5476": "25464",
@@ -624,7 +650,7 @@
     function estadosPermitidos(g) {
       const set = new Set([g.estado]);
       if (esAprobador() && !esCargado(g.estado) && g.estado !== 'ELIMINADO') {
-        ['PENDIENTE', 'APROBADO', 'RECHAZADO'].forEach(e => set.add(e));
+        ['APROBADO', 'RECHAZADO'].forEach(e => set.add(e));   // PENDIENTE solo lo asigna el sistema al crear la solicitud
       }
       if (esCedisAdmin()) {
         if (g.estado === 'APROBADO' || esCargado(g.estado)) { set.add('CARGADO'); set.add('CARGADO CON OBS'); }
@@ -841,6 +867,46 @@
       }
     };
 
+    // ---- Ir a una solicitud desde una notificación ----
+    let filtroNroNotif = null;
+    function nroDeNotificacion(n) {
+      const directo = n.nro_solicitud ?? n.solicitud_nro ?? n.nro;
+      if (directo != null && directo !== '') return String(directo);
+      const m = String(n.mensaje || '').match(/(?:N\.?\s*[º°o]\.?|n[úu]mero|nro\.?|n°|#)\s*(\d+)/i) || String(n.mensaje || '').match(/(\d+)/);
+      return m ? m[1] : null;
+    }
+    function filtrarPorNroNotif(grupos) {
+      if (filtroNroNotif == null) return grupos;
+      const sel = grupos.filter(g => String(g.nro) === String(filtroNroNotif));
+      sel.forEach(g => expandidos.add(g.key));
+      return sel;
+    }
+    function pintarBannerFiltro(tbody) {
+      const wrap = tbody.closest('.tbl-wrap');
+      let b = wrap.previousElementSibling && wrap.previousElementSibling.classList.contains('banner-filtro') ? wrap.previousElementSibling : null;
+      if (!b) { b = document.createElement('div'); b.className = 'banner-filtro'; wrap.parentNode.insertBefore(b, wrap); }
+      if (filtroNroNotif == null) { b.style.display = 'none'; return; }
+      b.innerHTML = '<span>🔎 Mostrando solo la solicitud N.º ' + esc(filtroNroNotif) + '</span><button type="button">Ver todas</button>';
+      b.querySelector('button').addEventListener('click', () => {
+        filtroNroNotif = null;
+        if (!$('sec-cedis').classList.contains('hidden')) cargarSolicitudesCedis(); else cargarSolicitudesSolicitante();
+      });
+      b.style.display = 'flex';
+    }
+    function resaltarSolicitudFiltrada(tbody) {
+      if (filtroNroNotif == null) return;
+      const fila = tbody.querySelector('tr.grp-head');
+      if (fila) { fila.classList.add('resaltada'); fila.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    }
+    function irANotificacion(n) {
+      marcarNotifLeida(n.id);
+      $('notifPanel').classList.add('hidden');
+      filtroNroNotif = nroDeNotificacion(n);
+      const tab = puedeGestionar() ? 'cedis' : 'solicitantes';
+      if (tab === 'cedis') $('filtroEstadoCedis').value = 'TODOS';   // que el estado no oculte la solicitud
+      cambiarTab(tab);
+    }
+
     function cambiarTab(tab) {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
@@ -863,8 +929,9 @@
       maestroPromesa = (async () => {
         const mapa = new Map(); const PAG = 1000;
         for (let desde = 0; ; desde += PAG) {
-          const { data, error } = await sb.from('maestro_multiplos')
-            .select('id_producto,multiplo_scz,multiplo_lpz').order('id_producto').range(desde, desde + PAG - 1);
+          const consulta = (cols) => sb.from('maestro_multiplos').select(cols).order('id_producto').range(desde, desde + PAG - 1);
+          let { data, error } = await consulta('id_producto,multiplo_scz,multiplo_lpz,tipo_material');
+          if (error) ({ data, error } = await consulta('id_producto,multiplo_scz,multiplo_lpz'));  // por si aún no existe tipo_material
           if (error) throw error;
           data.forEach(r => mapa.set(String(r.id_producto), r));
           if (data.length < PAG) break;
@@ -872,6 +939,10 @@
         maestroMultiplos = mapa; return mapa;
       })().catch(err => { maestroPromesa = null; throw err; });
       return maestroPromesa;
+    }
+    function tipoMaterialDe(sku) {
+      const reg = maestroMultiplos && maestroMultiplos.get(String(sku || '').trim());
+      return (reg && reg.tipo_material) || '—';
     }
     function errorFila(origen, sku, cantidad) {
       const col = ORIGEN_COL[normOrigen(origen)];
@@ -1092,6 +1163,7 @@
           <td>${esc(i.destino)}</td>
           <td><span class="sku-chip">${esc(i.sku)}</span></td>
           <td class="c qty">${esc(i.cantidad ?? 0)}</td>
+          <td>${esc(tipoMaterialDe(i.sku))}</td>
         </tr>`).join('');
       const total = g.items.reduce((s, i) => s + (Number(i.cantidad) || 0), 0);
       return `
@@ -1111,6 +1183,7 @@
                   <th>DESTINO</th>
                   <th>SKU</th>
                   <th class="c">CANTIDAD</th>
+                  <th>TIPO MATERIAL</th>
                 </tr>
               </thead>
               <tbody>${filas}</tbody>
@@ -1118,6 +1191,7 @@
                 <tr>
                   <td colspan="4" style="text-align:right">Total unidades</td>
                   <td class="c"><span class="total-pill">${total.toLocaleString('es-BO')}</span></td>
+                  <td></td>
                 </tr>
               </tfoot>
             </table>
@@ -1141,7 +1215,7 @@
           <td class="act-cell">
             <div class="act-stack">
               <select class="sel-estado fld fld-sm" ${estadosPermitidos(g).length < 2 ? 'disabled title="Sin cambios de estado disponibles para tu perfil"' : ''}>
-                ${estadosPermitidos(g).map(e => `<option value="${e}" ${g.estado === e ? 'selected' : ''}>${e}</option>`).join('')}
+                ${estadosPermitidos(g).map(e => `<option value="${e}" ${g.estado === e ? 'selected' : ''} ${e === 'PENDIENTE' ? 'disabled' : ''}>${e}</option>`).join('')}
               </select>
               <input type="text" class="inp-obs fld fld-sm" value="${esc(g.obs)}" placeholder="Observación CEDIS...">
               <div class="act-btns">
@@ -1202,14 +1276,17 @@
       const tbody = $('tablaSolicitantesBody');
       tbody.innerHTML = '<tr><td colspan="9" class="text-center p-4">Cargando solicitudes...</td></tr>';
       try {
-        const grupos = agrupar(await DB.listar('TODOS'));
-        renderTilesEstados('tilesSol', grupos);
+        const todos = agrupar(await DB.listar('TODOS'));
+        renderTilesEstados('tilesSol', todos);
+        const grupos = filtrarPorNroNotif(todos);
         gruposSolicitanteMap = new Map(grupos.map(g => [g.key, g]));
+        pintarBannerFiltro(tbody);
         if (!grupos.length) {
-          tbody.innerHTML = '<tr><td colspan="9" class="text-center p-4">No hay solicitudes.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="9" class="text-center p-4">' + (filtroNroNotif != null ? 'No se encontró la solicitud N.º ' + esc(filtroNroNotif) + '.' : 'No hay solicitudes.') + '</td></tr>';
           return;
         }
         renderGrupos(grupos, tbody, false);
+        resaltarSolicitudFiltrada(tbody);
       } catch (e) { tbody.innerHTML = '<tr><td colspan="9" class="text-center text-red-500">Error al cargar.</td></tr>'; }
     }
 
@@ -1239,18 +1316,21 @@
     async function cargarSolicitudesCedis() {
       if (!puedeGestionar()) return;
       const tbody = $('tablaCedisBody');
-      const filtroEstado = $('filtroEstadoCedis').value;
+      const filtroEstado = filtroNroNotif != null ? 'TODOS' : $('filtroEstadoCedis').value;
       tbody.innerHTML = '<tr><td colspan="10" class="text-center p-4">Cargando datos CEDIS...</td></tr>';
       try {
         let grupos = agrupar(await DB.listar('TODOS'));
         renderTilesEstados('tilesCedis', grupos);
         if (filtroEstado !== 'TODOS') grupos = grupos.filter(g => g.estado === filtroEstado);
+        grupos = filtrarPorNroNotif(grupos);
         gruposCedis = new Map(grupos.map(g => [g.key, g]));
+        pintarBannerFiltro(tbody);
         if (!grupos.length) {
-          tbody.innerHTML = '<tr><td colspan="10" class="text-center p-4">No hay solicitudes en este estado.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="10" class="text-center p-4">' + (filtroNroNotif != null ? 'No se encontró la solicitud N.º ' + esc(filtroNroNotif) + '.' : 'No hay solicitudes en este estado.') + '</td></tr>';
           return;
         }
         renderGrupos(grupos, tbody, true);
+        resaltarSolicitudFiltrada(tbody);
       } catch (err) {
         tbody.innerHTML = '<tr><td colspan="10" class="text-center text-red-500">Error al cargar CEDIS: ' + esc(err.message || err) + '</td></tr>';
       }
@@ -1264,6 +1344,11 @@
       const obs = cont.querySelector('.inp-obs').value.trim();
       const ahora = new Date().toISOString();
 
+      if (estado === 'PENDIENTE' && g.estado !== 'PENDIENTE') {
+        alert('PENDIENTE es el estado inicial de toda solicitud nueva y no se puede volver a seleccionar.');
+        await cargarSolicitudesCedis();
+        return;
+      }
       if (!estadosPermitidos(g).includes(estado)) {
         alert(esCargado(estado)
           ? 'Solo CEDIS/Admin pueden cargar, y únicamente solicitudes APROBADAS.'
@@ -1343,7 +1428,7 @@
 
     // ---- Notificaciones (campana) ----
     // Las notificaciones las crean triggers en Supabase (ver notificaciones.sql).
-    let notifItems = [], notifIniciado = false;
+    let notifItems = [], notifIniciado = false, notifCargadaUnaVez = false;
     const NOTIF_ICONO = { nueva: '📥', aprobada: '✅', cargada: '📦', rechazada: '❌', eliminada: '🗑️' };
 
     function pintarNotificaciones() {
@@ -1351,6 +1436,9 @@
       const badge = $('notifBadge');
       badge.textContent = noLeidas > 99 ? '99+' : String(noLeidas);
       badge.classList.toggle('hidden', noLeidas === 0);
+      $('btnBell').classList.toggle('tiene-nuevas', noLeidas > 0);
+      if (!window.__tituloBase) window.__tituloBase = document.title;
+      document.title = (noLeidas > 0 ? '(' + noLeidas + ') ' : '') + window.__tituloBase;
       const lista = $('notifList');
       if (!notifItems.length) { lista.innerHTML = '<div class="notif-vacio">No tienes notificaciones.</div>'; return; }
       lista.innerHTML = notifItems.map(n => {
@@ -1366,23 +1454,75 @@
       const { data, error } = await sb.from('notificaciones').select('*')
         .eq('user_id', usuarioActual.id).order('created_at', { ascending: false }).limit(30);
       if (error) return; // si aún no se ejecutó notificaciones.sql, la campana queda vacía
+      const conocidas = new Set(notifItems.map(x => String(x.id)));
+      const primera = !notifCargadaUnaVez;
       notifItems = data || [];
+      notifCargadaUnaVez = true;
       pintarNotificaciones();
+      if (!primera) notifItems.filter(x => !x.leida && !conocidas.has(String(x.id))).slice(0, 3).reverse().forEach(avisoNotificacion);
+    }
+
+    // ---- Sonido (Web Audio, sin archivos externos) ----
+    let audioCtx = null, notifSonido = true;
+    try { notifSonido = localStorage.getItem('notifSonido') !== 'off'; } catch (e) {}
+    function desbloquearAudio() {
+      try {
+        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+      } catch (e) {}
+    }
+    ['click', 'keydown', 'touchstart'].forEach(ev => document.addEventListener(ev, desbloquearAudio, { passive: true }));
+    function sonarNotificacion() {
+      if (!notifSonido) return;
+      try {
+        desbloquearAudio();
+        if (!audioCtx || audioCtx.state !== 'running') return;   // el navegador aún no permite audio (falta un clic en la página)
+        const t0 = audioCtx.currentTime;
+        [[880, 0], [1175, 0.16], [1568, 0.32]].forEach(([f, d]) => {
+          const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+          o.type = 'triangle'; o.frequency.value = f;
+          g.gain.setValueAtTime(0.0001, t0 + d);
+          g.gain.exponentialRampToValueAtTime(0.5, t0 + d + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.0001, t0 + d + 0.28);
+          o.connect(g).connect(audioCtx.destination);
+          o.start(t0 + d); o.stop(t0 + d + 0.3);
+        });
+      } catch (e) {}
+    }
+    function pintarBotonSonido() {
+      const b = $('btnNotifSonido'); if (b) b.textContent = notifSonido ? '🔊 Sonido' : '🔇 Silenciado';
     }
 
     function avisoNotificacion(n) {
       const bell = $('btnBell');
       bell.classList.remove('ring'); void bell.offsetWidth; bell.classList.add('ring');
+      let cont = $('notifToasts');
+      if (!cont) { cont = document.createElement('div'); cont.id = 'notifToasts'; document.body.appendChild(cont); }
+      while (cont.children.length >= 4) cont.firstChild.remove();
       const t = document.createElement('div');
-      t.className = 'notif-toast'; t.textContent = (NOTIF_ICONO[n.tipo] || '🔔') + ' ' + n.mensaje;
-      t.addEventListener('click', () => { t.remove(); abrirNotificaciones(true); });
-      document.body.appendChild(t);
-      setTimeout(() => t.remove(), 6000);
+      t.className = 'notif-toast';
+      t.innerHTML = '<span class="t-ico">' + (NOTIF_ICONO[n.tipo] || '🔔') + '</span>' +
+        '<div class="t-body"><small>Nueva notificación</small>' + esc(n.mensaje) + '</div>' +
+        '<button type="button" class="t-x" aria-label="Cerrar">×</button>';
+      const cerrar = () => { t.classList.add('sale'); setTimeout(() => t.remove(), 300); };
+      t.querySelector('.t-x').addEventListener('click', (e) => { e.stopPropagation(); cerrar(); });
+      t.addEventListener('click', () => { t.remove(); irANotificacion(n); });
+      cont.appendChild(t);
+      setTimeout(() => { if (t.isConnected) cerrar(); }, 12000);
+      sonarNotificacion();
     }
 
     function iniciarNotificaciones() {
       if (notifIniciado || !usuarioActual) return;
       notifIniciado = true;
+      pintarBotonSonido();
+      $('btnNotifSonido').addEventListener('click', (e) => {
+        e.stopPropagation();
+        notifSonido = !notifSonido;
+        try { localStorage.setItem('notifSonido', notifSonido ? 'on' : 'off'); } catch (err) {}
+        pintarBotonSonido();
+        if (notifSonido) sonarNotificacion();   // prueba al activarlo
+      });
       cargarNotificaciones();
       sb.channel('notif-' + usuarioActual.id)
         .on('postgres_changes',
@@ -1427,13 +1567,12 @@
         e.stopPropagation();
         const item = e.target.closest('.notif-item');
         if (!item) return;
-        marcarNotifLeida(item.dataset.id);
-        $('notifPanel').classList.add('hidden');
-        cambiarTab(puedeGestionar() ? 'cedis' : 'solicitantes');
+        const n = notifItems.find(x => String(x.id) === String(item.dataset.id));
+        if (n) irANotificacion(n);
       });
       document.addEventListener('click', () => $('notifPanel').classList.add('hidden'));
       document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('notifPanel').classList.add('hidden'); });
-      document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => cambiarTab(btn.dataset.tab)));
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => { filtroNroNotif = null; cambiarTab(btn.dataset.tab); }));
       (function () {
         const tabla = $('tablaCuerpo').closest('table');
         const caja = document.createElement('div'); caja.id = 'errMultiplos';
