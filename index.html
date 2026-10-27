@@ -936,6 +936,7 @@
           data.forEach(r => mapa.set(String(r.id_producto), r));
           if (data.length < PAG) break;
         }
+        if (mapa.size === 0) throw new Error('Maestro vacío: sin sesión o sin permiso de lectura');
         maestroMultiplos = mapa; return mapa;
       })().catch(err => { maestroPromesa = null; throw err; });
       return maestroPromesa;
