@@ -639,25 +639,54 @@
     const ESTADOS = ['PENDIENTE', 'APROBADO', 'RECHAZADO', 'CARGADO', 'CARGADO CON OBS', 'ELIMINADO'];
 
     // ---- Permisos ----
-    // Únicos usuarios que pueden aprobar/rechazar (también se valida en Supabase con un trigger).
-    // Estos usuarios NO pueden cargar, cargar con obs ni eliminar, aunque su rol en perfiles sea cedis/admin.
-    const EMAILS_APROBADORES = ['yvillarroel@farmaciaschavez.com.bo', 'lcoca@farmaciaschavez.com.bo'];
+    // Los permisos salen de la tabla permisos_rol (Supabase) según el rol del perfil.
+    // La pantalla solo refleja lo permitido: quien lo hace cumplir es el servidor (trigger y políticas).
+    // Acciones: crear, ver_propias, ver_todas, aprobar, rechazar, cargar, cargar_obs,
+    //           eliminar_propias, eliminar_ajenas, copiar, ver_dashboard, editar_obs, editar_todo
+    let permisos = new Set();
+    const puede = (accion) => permisos.has(accion);
     const esCargado = (e) => e === 'CARGADO' || e === 'CARGADO CON OBS';
-    const esAprobador = () => !!(usuarioActual && EMAILS_APROBADORES.includes(String(usuarioActual.email || '').trim().toLowerCase()));
-    const esCedisAdmin = () => !esAprobador() && (rolActual === 'cedis' || rolActual === 'admin');
-    const puedeGestionar = () => esAprobador() || esCedisAdmin();
+    const puedeGestionar = () => ['aprobar', 'rechazar', 'cargar', 'cargar_obs', 'editar_todo'].some(puede);
+    const esPropia = (g) => !!(usuarioActual && g.user_id && g.user_id === usuarioActual.id);
+    const tabInicial = () => (puede('crear') ? 'registro' : 'solicitantes');
 
     // Estados que el usuario actual puede asignar a una solicitud (siempre incluye el actual)
     function estadosPermitidos(g) {
       const set = new Set([g.estado]);
-      if (esAprobador() && !esCargado(g.estado) && g.estado !== 'ELIMINADO') {
-        ['APROBADO', 'RECHAZADO'].forEach(e => set.add(e));   // PENDIENTE solo lo asigna el sistema al crear la solicitud
-      }
-      if (esCedisAdmin()) {
-        if (g.estado === 'APROBADO' || esCargado(g.estado)) { set.add('CARGADO'); set.add('CARGADO CON OBS'); }
-        set.add('ELIMINADO');
+      if (puede('editar_todo')) {
+        ESTADOS.forEach(e => set.add(e));                      // admin: edita todo
+      } else if (!esCargado(g.estado) && g.estado !== 'ELIMINADO') {   // una solicitud cargada queda fija
+        if (g.estado === 'PENDIENTE') {
+          if (puede('aprobar')) set.add('APROBADO');
+          if (puede('rechazar')) set.add('RECHAZADO');
+          if (puede('eliminar_ajenas') || (puede('eliminar_propias') && esPropia(g))) set.add('ELIMINADO');
+        } else if (g.estado === 'APROBADO') {
+          if (puede('cargar')) set.add('CARGADO');
+          if (puede('cargar_obs')) set.add('CARGADO CON OBS');
+          if (puede('eliminar_ajenas')) set.add('ELIMINADO');
+        } else if (puede('eliminar_ajenas')) {
+          set.add('ELIMINADO');
+        }
       }
       return ESTADOS.filter(e => set.has(e));
+    }
+
+    async function cargarPermisos() {
+      permisos = new Set();
+      try {
+        const { data, error } = await sb.from('permisos_rol').select('accion').eq('rol', rolActual);
+        if (error) throw error;
+        permisos = new Set((data || []).map(r => r.accion));
+      } catch (e) {
+        console.error('No se pudieron cargar los permisos', e);
+        alert('No se pudieron cargar los permisos de tu rol. Recarga la página; si el problema continúa, avisa al administrador.');
+      }
+    }
+
+    function aplicarPermisosEnPantalla() {
+      $('tabBtnCedis').classList.toggle('hidden', !puedeGestionar());
+      $('tabBtnDash').classList.toggle('hidden', !puede('ver_dashboard'));
+      document.querySelector('.tab-btn[data-tab="registro"]').classList.toggle('hidden', !puede('crear'));
     }
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -722,10 +751,8 @@
       } catch (e) {
         $('userInfoDisplay').textContent = usuarioActual.email;
       }
-      if (puedeGestionar()) {
-        $('tabBtnCedis').classList.remove('hidden');
-        $('tabBtnDash').classList.remove('hidden');
-      }
+      await cargarPermisos();
+      aplicarPermisosEnPantalla();
       aplicarPerfilAlFormulario();
       iniciarNotificaciones();
     }
@@ -749,8 +776,8 @@
         errDiv.textContent = 'Credenciales incorrectas o usuario no registrado.';
         errDiv.classList.remove('hidden');
       } else {
-        verificarSesion();
-        cambiarTab('registro');
+        await verificarSesion();
+        cambiarTab(tabInicial());
         agregarFilaTabla();
       }
     });
@@ -1202,7 +1229,7 @@
     }
 
     function esDuenoPendiente(g) {
-      return !!(usuarioActual && !esAprobador() && g.user_id && g.user_id === usuarioActual.id
+      return !!(usuarioActual && puede('eliminar_propias') && esPropia(g)
         && g.items.every(i => i.estado === 'PENDIENTE'));
     }
 
@@ -1213,16 +1240,22 @@
         const abierto = expandidos.has(g.key);
         let accion = '';
         if (conAccion) {
+          const permitidos = estadosPermitidos(g);
+          const sinCambios = permitidos.length < 2;
+          const sinAcciones = sinCambios && !puede('editar_obs') && !puede('editar_todo');
+          const titulo = esCargado(g.estado) && sinCambios
+            ? 'Solicitud cargada: solo un administrador puede cambiarla'
+            : 'Sin cambios de estado disponibles para tu perfil';
           accion = `
           <td class="act-cell">
             <div class="act-stack">
-              <select class="sel-estado fld fld-sm" ${estadosPermitidos(g).length < 2 ? 'disabled title="Sin cambios de estado disponibles para tu perfil"' : ''}>
-                ${estadosPermitidos(g).map(e => `<option value="${e}" ${g.estado === e ? 'selected' : ''} ${e === 'PENDIENTE' ? 'disabled' : ''}>${e}</option>`).join('')}
+              <select class="sel-estado fld fld-sm" ${sinCambios ? `disabled title="${titulo}"` : ''}>
+                ${permitidos.map(e => `<option value="${e}" ${g.estado === e ? 'selected' : ''} ${e === 'PENDIENTE' && !puede('editar_todo') ? 'disabled' : ''}>${e}</option>`).join('')}
               </select>
-              <input type="text" class="inp-obs fld fld-sm" value="${esc(g.obs)}" placeholder="Observación CEDIS...">
+              <input type="text" class="inp-obs fld fld-sm" value="${esc(g.obs)}" placeholder="Observación CEDIS..." ${sinAcciones ? 'disabled' : ''}>
               <div class="act-btns">
-                <button type="button" class="btn-guardar btn-mini btn-navy" data-key="${esc(g.key)}">${SVG_SAVE} Guardar</button>
-                ${esCedisAdmin() && (g.estado === 'APROBADO' || esCargado(g.estado)) ? `<button type="button" class="btn-copiar btn-mini btn-green" data-key="${esc(g.key)}" title="Copia filas">${SVG_COPY} Copiar</button>` : ''}
+                <button type="button" class="btn-guardar btn-mini btn-navy" data-key="${esc(g.key)}" ${sinAcciones ? 'disabled' : ''}>${SVG_SAVE} Guardar</button>
+                ${puede('copiar') && (g.estado === 'APROBADO' || esCargado(g.estado)) ? `<button type="button" class="btn-copiar btn-mini btn-green" data-key="${esc(g.key)}" title="Copia filas">${SVG_COPY} Copiar</button>` : ''}
               </div>
             </div>
           </td>`;
@@ -1346,15 +1379,22 @@
       const obs = cont.querySelector('.inp-obs').value.trim();
       const ahora = new Date().toISOString();
 
-      if (estado === 'PENDIENTE' && g.estado !== 'PENDIENTE') {
-        alert('PENDIENTE es el estado inicial de toda solicitud nueva y no se puede volver a seleccionar.');
+      if (estado === 'PENDIENTE' && g.estado !== 'PENDIENTE' && !puede('editar_todo')) {
+        alert('PENDIENTE es el estado inicial de toda solicitud nueva. Solo un administrador puede devolver una solicitud a ese estado.');
         await cargarSolicitudesCedis();
         return;
       }
       if (!estadosPermitidos(g).includes(estado)) {
-        alert(esCargado(estado)
-          ? 'Solo CEDIS/Admin pueden cargar, y únicamente solicitudes APROBADAS.'
-          : 'Solo ' + EMAILS_APROBADORES.join(' o ') + ' pueden aprobar o rechazar solicitudes.');
+        alert(esCargado(g.estado)
+          ? 'La solicitud ya fue cargada: solo un administrador puede cambiar su estado.'
+          : 'Tu rol no permite cambiar esta solicitud a ' + estado + '.');
+        await cargarSolicitudesCedis();
+        return;
+      }
+      // Sin cambio de estado, las observaciones solo las edita quien tenga ese permiso
+      const obsOriginal = g.obs || '';
+      if (estado === g.estado && obs !== obsOriginal.trim() && !puede('editar_obs') && !puede('editar_todo')) {
+        alert('No tienes permiso para editar observaciones. Solo puedes escribirlas al cambiar el estado de la solicitud.');
         await cargarSolicitudesCedis();
         return;
       }
@@ -1370,7 +1410,9 @@
 
       btn.disabled = true;
       try {
-        const cambios = { estado, observaciones_cedis: obs, fecha_aprobacion: aprob, fecha_carga: carga, cargado_por: cargado };
+        // Si la observación no se tocó, se envía tal cual está guardada (sin recortar espacios)
+        const obsEnviar = (estado === g.estado && obs === obsOriginal.trim()) ? obsOriginal : obs;
+        const cambios = { estado, observaciones_cedis: obsEnviar, fecha_aprobacion: aprob, fecha_carga: carga, cargado_por: cargado };
         const ids = g.items.map(i => i.id);
         try {
           await DB.actualizar(ids, cambios);
@@ -1425,7 +1467,7 @@
     }
 
     async function cargarDashboard() {
-      if (!puedeGestionar()) return;
+      if (!puede('ver_dashboard')) return;
     }
 
     // ---- Notificaciones (campana) ----
@@ -1562,7 +1604,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-      verificarSesion();
+      verificarSesion().then(() => { if (usuarioActual && !puede('crear')) cambiarTab(tabInicial()); });
       $('btnBell').addEventListener('click', (e) => { e.stopPropagation(); abrirNotificaciones(); });
       $('btnNotifTodas').addEventListener('click', marcarTodasLeidas);
       $('notifPanel').addEventListener('click', (e) => {
