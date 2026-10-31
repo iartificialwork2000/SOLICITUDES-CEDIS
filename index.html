@@ -384,7 +384,7 @@
                 <span id="notifBadge" class="notif-badge hidden">0</span>
               </button>
               <div id="notifPanel" class="notif-panel hidden">
-                <div class="notif-head"><span>Notificaciones</span><span style="display:flex;gap:12px;align-items:center"><button type="button" id="btnNotifSonido" class="notif-sonido" title="Activar o silenciar el sonido">🔊 Sonido</button><button type="button" id="btnNotifTodas">Marcar todas como leídas</button></span></div>
+                <div class="notif-head"><span>Notificaciones</span><span style="display:flex;gap:12px;align-items:center"><button type="button" id="btnNotifEscritorio" class="notif-sonido" title="Recibir avisos de escritorio">🖥️ Activar avisos</button><button type="button" id="btnNotifSonido" class="notif-sonido" title="Activar o silenciar el sonido">🔊 Sonido</button><button type="button" id="btnNotifTodas">Marcar todas como leídas</button></span></div>
                 <div id="notifList" class="notif-list"><div class="notif-vacio">Cargando…</div></div>
               </div>
             </div>
@@ -783,6 +783,7 @@
     });
 
     $('btnLogout').addEventListener('click', async () => {
+      await desuscribirPush();   // este equipo deja de recibir avisos de este usuario
       await sb.auth.signOut();
       perfilActual = null; rolActual = 'solicitante';
       location.reload();
@@ -1554,12 +1555,104 @@
       cont.appendChild(t);
       setTimeout(() => { if (t.isConnected) cerrar(); }, 12000);
       sonarNotificacion();
+      avisoEscritorio(n);
+    }
+
+    // ---- Avisos de escritorio (notificaciones del sistema, vía service worker) ----
+    function escritorioDisponible() {
+      return ('Notification' in window) && ('serviceWorker' in navigator);
+    }
+    async function avisoEscritorio(n) {
+      try {
+        if (!escritorioDisponible() || Notification.permission !== 'granted') return;
+        const reg = await navigator.serviceWorker.ready;
+        await reg.showNotification('Solicitudes CEDIS', {
+          body: n.mensaje || 'Tienes una nueva notificación',
+          icon: 'icon-192.png',
+          badge: 'icon-192.png',
+          tag: 'notif-' + n.id,          // evita avisos duplicados del mismo registro
+          renotify: false,
+          requireInteraction: true,      // se queda en pantalla hasta que la cierres o hagas clic
+          data: { id: n.id }
+        });
+      } catch (e) {}
+    }
+    function pintarBotonEscritorio() {
+      const b = $('btnNotifEscritorio'); if (!b) return;
+      if (!escritorioDisponible()) { b.style.display = 'none'; return; }
+      const p = Notification.permission;
+      b.textContent = p === 'granted' ? '🖥️ Avisos activados' : p === 'denied' ? '🖥️ Avisos bloqueados' : '🖥️ Activar avisos';
+      b.title = p === 'denied' ? 'Permite las notificaciones para este sitio en la configuración del navegador (candado junto a la dirección)' : 'Recibir avisos de escritorio';
+    }
+    async function pedirPermisoEscritorio() {
+      if (!escritorioDisponible()) return;
+      if (Notification.permission === 'default') {
+        try { await Notification.requestPermission(); } catch (e) {}
+      }
+      pintarBotonEscritorio();
+      if (Notification.permission === 'granted') {
+        await suscribirPush();
+        // Aviso de prueba para confirmar que funciona
+        avisoEscritorio({ id: 'prueba-' + Date.now(), mensaje: 'Los avisos de escritorio están activados ✅' });
+      }
+    }
+
+    // ---- Web Push: avisos aunque la app esté cerrada ----
+    // Clave pública VAPID (la privada vive solo en Supabase, como secreto de la función "enviar-push")
+    const VAPID_PUBLIC_KEY = 'BP_I4tuVoOy_5zWEpEzfzcRTwr-YoTbwzSJqp4EEI4A1omPiiWGtG0JevjcrPwGfn3lqVlF7JG08lDlWIic7g4c';
+    function vapidAUint8(b64) {
+      const pad = '='.repeat((4 - b64.length % 4) % 4);
+      const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+      return Uint8Array.from(raw, c => c.charCodeAt(0));
+    }
+    async function suscribirPush() {
+      try {
+        if (!escritorioDisponible() || !('PushManager' in window) || Notification.permission !== 'granted' || !usuarioActual) return;
+        const reg = await navigator.serviceWorker.ready;
+        let sub = await reg.pushManager.getSubscription();
+        if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidAUint8(VAPID_PUBLIC_KEY) });
+        const j = sub.toJSON();
+        // Guarda (o actualiza) este dispositivo para el usuario actual
+        await sb.rpc('registrar_push', {
+          p_endpoint: j.endpoint,
+          p_p256dh: j.keys.p256dh,
+          p_auth: j.keys.auth,
+          p_ua: navigator.userAgent.slice(0, 200)
+        });
+      } catch (e) {}
+    }
+    async function desuscribirPush() {
+      try {
+        if (!escritorioDisponible() || !('PushManager' in window)) return;
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (!sub) return;
+        await sb.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
+        await sub.unsubscribe();
+      } catch (e) {}
+    }
+    // Al hacer clic en un aviso de escritorio, el service worker nos pide abrir esa notificación
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', (e) => {
+        if (!e.data || e.data.tipo !== 'abrir-notificacion') return;
+        const n = notifItems.find(x => String(x.id) === String(e.data.id));
+        if (n) irANotificacion(n);
+      });
     }
 
     function iniciarNotificaciones() {
       if (notifIniciado || !usuarioActual) return;
       notifIniciado = true;
       pintarBotonSonido();
+      pintarBotonEscritorio();
+      $('btnNotifEscritorio').addEventListener('click', (e) => { e.stopPropagation(); pedirPermisoEscritorio(); });
+      // Pide el permiso en el primer clic dentro de la app (los navegadores exigen un gesto del usuario)
+      if (escritorioDisponible() && Notification.permission === 'default') {
+        document.addEventListener('click', function pedir() {
+          document.removeEventListener('click', pedir);
+          pedirPermisoEscritorio();
+        }, { once: true });
+      }
       $('btnNotifSonido').addEventListener('click', (e) => {
         e.stopPropagation();
         notifSonido = !notifSonido;
@@ -1567,7 +1660,18 @@
         pintarBotonSonido();
         if (notifSonido) sonarNotificacion();   // prueba al activarlo
       });
-      cargarNotificaciones();
+      // Si ya hay permiso, registra/renueva la suscripción push de este dispositivo
+      suscribirPush();
+      cargarNotificaciones().then(() => {
+        // La app se abrió desde un aviso push: mostrar esa solicitud
+        try {
+          const id = new URLSearchParams(location.search).get('notif');
+          if (!id) return;
+          history.replaceState(null, '', location.pathname);
+          const n = notifItems.find(x => String(x.id) === String(id));
+          if (n) irANotificacion(n);
+        } catch (e) {}
+      });
       sb.channel('notif-' + usuarioActual.id)
         .on('postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'notificaciones', filter: 'user_id=eq.' + usuarioActual.id },
