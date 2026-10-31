@@ -599,17 +599,14 @@
 
           <div class="dash-sec">⏱️ Tiempos del ciclo y pendientes</div>
           <div class="tiles" id="dashTiempos"></div>
-          <div class="dash-grid2" style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
-            <div class="inner col"><h3 style="margin-bottom:8px">⏱️ Horas promedio por mes</h3><div style="height:260px;"><canvas id="chartCiclo"></canvas></div></div>
-            <div class="inner col"><h3 style="margin-bottom:8px">⚠️ Pendientes con más antigüedad</h3><div id="dashPendientes"></div></div>
-          </div>
 
-          <div class="dash-sec">✅ Calidad: rechazos y cargas con observaciones</div>
+          <div class="dash-sec">✅ Fill rate y calidad</div>
           <div class="tiles" id="dashCalidad"></div>
           <div class="dash-grid2" style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
-            <div class="inner col"><h3 style="margin-bottom:8px">% de rechazo y de cargas con obs. por área</h3><div style="height:260px;"><canvas id="chartCalidad"></canvas></div></div>
-            <div class="inner col"><h3 style="margin-bottom:8px">📝 Últimos rechazos y cargas con observación</h3><div id="dashMotivos"></div></div>
+            <div class="inner col"><h3 style="margin-bottom:8px">📈 Fill rate por mes (% de solicitudes aprobadas)</h3><div style="height:260px;"><canvas id="chartFillMes"></canvas></div></div>
+            <div class="inner col"><h3 style="margin-bottom:8px">🏢 Fill rate por área</h3><div style="height:260px;"><canvas id="chartFillArea"></canvas></div></div>
           </div>
+          <div class="inner col"><h3 style="margin-bottom:8px">📝 Últimos rechazos y cargas con observación</h3><div id="dashMotivos"></div></div>
 
           <div class="dash-sec">📦 Volumen: filas, material y destinos</div>
           <div class="tiles" id="dashVolumen"></div>
@@ -1688,7 +1685,6 @@
 
       // ===== 1) Tiempos del ciclo (solicitudes aprobadas / cargadas) =====
       const tAprob = [], tCarga = [], tTotal = [];
-      const mesTiempos = new Map();   // mes de la solicitud -> { a: [], c: [] }
       grupos.forEach(g => {
         const a = g.fecha_aprobacion ? horas(g.created_at, g.fecha_aprobacion) : null;
         const c = (g.fecha_aprobacion && g.fecha_carga) ? horas(g.fecha_aprobacion, g.fecha_carga) : null;
@@ -1696,12 +1692,6 @@
         if (a != null) tAprob.push(a);
         if (c != null) tCarga.push(c);
         if (t != null) tTotal.push(t);
-        const k = claveMes(g.created_at);
-        if (k && (a != null || c != null)) {
-          const r = mesTiempos.get(k) || { a: [], c: [] };
-          if (a != null) r.a.push(a); if (c != null) r.c.push(c);
-          mesTiempos.set(k, r);
-        }
       });
 
       // ===== 2) Pendientes envejecidas =====
@@ -1722,48 +1712,46 @@
         tile('Abiertas > 24 h', mas24, mas24 ? 'c-orange' : 'c-green', 'Pendientes de aprobar o cargar') +
         tile('Abiertas > 48 h', mas48, mas48 ? 'c-red' : 'c-green', 'Requieren atención');
 
-      const meses12 = [...mesTiempos.keys()].sort().slice(-12);
-      dashGrafico('chartCiclo', {
-        type: 'bar',
-        data: {
-          labels: meses12.map(etiquetaMes),
-          datasets: [
-            { label: 'Hasta aprobar (h)', data: meses12.map(k => +(prom(mesTiempos.get(k).a) || 0).toFixed(1)), backgroundColor: '#1cbcec', borderRadius: 4 },
-            { label: 'De aprobar a cargar (h)', data: meses12.map(k => +(prom(mesTiempos.get(k).c) || 0).toFixed(1)), backgroundColor: '#8b5cf6', borderRadius: 4 }
-          ]
-        },
-        options: { ...opcionesBase, plugins: { legend: { position: 'bottom' } }, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Horas' } } } }
-      });
-
-      $('dashPendientes').innerHTML = abiertas.length
-        ? '<table class="dash-tabla"><thead><tr><th>N.º</th><th>Área / Solicitante</th><th>Etapa</th><th>Antigüedad</th></tr></thead><tbody>' +
-          abiertas.slice(0, 10).map(x => '<tr><td><b>' + esc(x.g.nro) + '</b></td><td>' + esc(x.g.area || '—') + '<br><span style="color:#64748b;font-size:11.5px">' + esc(x.g.solicitante || '') + '</span></td><td>' + x.etapa + '</td>' +
-            '<td><span class="dash-pill ' + (x.h > 48 ? 'rojo' : x.h > 24 ? 'amb' : '') + '">' + fmtH(x.h) + '</span></td></tr>').join('') +
-          '</tbody></table>' + (abiertas.length > 10 ? '<div style="font-size:11.5px;color:#64748b;margin-top:6px">Mostrando 10 de ' + abiertas.length + ' abiertas.</div>' : '')
-        : '<div class="notif-vacio">No hay solicitudes pendientes. 🎉</div>';
-
       // ===== 3) Calidad: rechazos y cargas con observaciones =====
       const nTot = grupos.length;
       const nRech = grupos.filter(g => g.estado === 'RECHAZADO').length;
       const nCarg = grupos.filter(g => g.estado === 'CARGADO' || g.estado === 'CARGADO CON OBS').length;
       const nObs = grupos.filter(g => g.estado === 'CARGADO CON OBS').length;
+      // Fill rate = solicitudes aprobadas (aprobadas + cargadas) sobre las ya resueltas (aprobadas + rechazadas). Las pendientes aún no cuentan.
+      const esAprobada = (g) => g.estado === 'APROBADO' || g.estado === 'CARGADO' || g.estado === 'CARGADO CON OBS';
+      const esResuelta = (g) => esAprobada(g) || g.estado === 'RECHAZADO';
+      const nApr = grupos.filter(esAprobada).length, nRes = grupos.filter(esResuelta).length, nPend = grupos.filter(g => g.estado === 'PENDIENTE').length;
+      const fr = pct(nApr, nRes);
       $('dashCalidad').innerHTML =
+        tile('Fill rate', nRes ? fmtPct(fr) : '—', !nRes ? 'c-blue' : fr >= 90 ? 'c-green' : fr >= 75 ? 'c-orange' : 'c-red', nApr + ' aprobadas de ' + nRes + ' resueltas · ' + nPend + ' pendientes') +
         tile('Tasa de rechazo', fmtPct(pct(nRech, nTot)), nRech ? 'c-red' : 'c-green', nRech + ' de ' + nTot + ' solicitudes') +
         tile('Cargadas con obs.', fmtPct(pct(nObs, nCarg)), nObs ? 'c-orange' : 'c-green', nObs + ' de ' + nCarg + ' cargadas');
 
-      const areasC = [...new Set(grupos.map(g => g.area || 'Sin área'))].sort();
-      dashGrafico('chartCalidad', {
-        type: 'bar',
+      const frMes = new Map();   // mes de la solicitud -> { apr, res }
+      grupos.filter(esResuelta).forEach(g => {
+        const k = claveMes(g.created_at); if (!k) return;
+        const r = frMes.get(k) || { apr: 0, res: 0 };
+        r.res++; if (esAprobada(g)) r.apr++;
+        frMes.set(k, r);
+      });
+      const mesesFr = [...frMes.keys()].sort().slice(-12);
+      dashGrafico('chartFillMes', {
+        type: 'line',
         data: {
-          labels: areasC,
-          datasets: [
-            { label: '% rechazo (sobre solicitudes)', backgroundColor: '#e11d2e', borderRadius: 4,
-              data: areasC.map(a => +pct(grupos.filter(g => (g.area || 'Sin área') === a && g.estado === 'RECHAZADO').length, grupos.filter(g => (g.area || 'Sin área') === a).length).toFixed(1)) },
-            { label: '% cargadas con obs. (sobre cargadas)', backgroundColor: '#f59e0b', borderRadius: 4,
-              data: areasC.map(a => { const c = grupos.filter(g => (g.area || 'Sin área') === a && (g.estado === 'CARGADO' || g.estado === 'CARGADO CON OBS')); return +pct(c.filter(g => g.estado === 'CARGADO CON OBS').length, c.length).toFixed(1); }) }
-          ]
+          labels: mesesFr.map(etiquetaMes),
+          datasets: [{ label: 'Fill rate (%)', data: mesesFr.map(k => +pct(frMes.get(k).apr, frMes.get(k).res).toFixed(1)), borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,.15)', fill: true, tension: .3, pointRadius: 4 }]
         },
-        options: { ...opcionesBase, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' } } } }
+        options: { ...opcionesBase, plugins: { legend: { display: false }, tooltip: { callbacks: { afterLabel: (c) => { const r = frMes.get(mesesFr[c.dataIndex]); return r.apr + ' aprobadas de ' + r.res + ' resueltas'; } } } },
+          scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' } } } }
+      });
+
+      const areasFr = [...new Set(grupos.filter(esResuelta).map(g => g.area || 'Sin área'))].sort();
+      const frArea = (a) => { const r = grupos.filter(g => (g.area || 'Sin área') === a && esResuelta(g)); return { apr: r.filter(esAprobada).length, res: r.length }; };
+      dashGrafico('chartFillArea', {
+        type: 'bar',
+        data: { labels: areasFr, datasets: [{ label: 'Fill rate (%)', data: areasFr.map(a => +pct(frArea(a).apr, frArea(a).res).toFixed(1)), backgroundColor: '#16a34a', borderRadius: 6 }] },
+        options: { ...opcionesBase, plugins: { legend: { display: false }, tooltip: { callbacks: { afterLabel: (c) => { const r = frArea(areasFr[c.dataIndex]); return r.apr + ' aprobadas de ' + r.res + ' resueltas'; } } } },
+          scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' } } } }
       });
 
       const motivos = grupos.filter(g => (g.estado === 'RECHAZADO' || g.estado === 'CARGADO CON OBS')).slice(0, 6);   // ya vienen de más reciente a más antigua
