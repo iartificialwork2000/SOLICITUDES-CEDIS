@@ -163,6 +163,14 @@
     .tile .t-v { font-size: 26px; font-weight: 800; line-height: 1.2; margin-top: 4px; }
     .c-blue { color: var(--blue); } .c-purple { color: var(--purple); } .c-green { color: var(--green); }
     .c-orange { color: var(--orange); } .c-red { color: var(--red); }
+    .dash-sec { margin: 4px 0 -4px; font-size: 14px; font-weight: 800; color: var(--navy); letter-spacing: .02em; }
+    .tile .t-s { font-size: 11px; font-weight: 700; color: #64748b; margin-top: 2px; }
+    .dash-tabla { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    .dash-tabla th { text-align: left; font-size: 10px; letter-spacing: .05em; text-transform: uppercase; color: #64748b; padding: 6px 8px; border-bottom: 1px solid #e3eef7; }
+    .dash-tabla td { padding: 7px 8px; border-bottom: 1px solid #edf4fa; color: var(--navy); vertical-align: top; }
+    .dash-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-weight: 800; font-size: 11.5px; background: #e6f4fd; color: var(--blue); white-space: nowrap; }
+    .dash-pill.amb { background: #fff4d6; color: #b45309; } .dash-pill.rojo { background: #fde2e4; color: #c01028; }
+    @media (max-width: 800px) { .dash-grid2 { grid-template-columns: 1fr !important; } }
 
     .tbl-wrap { background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(0, 60, 100, .1); }
     .wms-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -574,6 +582,29 @@
         </div>
         <div class="card-b" style="display:flex; flex-direction:column; gap:14px;">
           <div class="tiles" id="dashTiles"></div>
+
+          <div class="dash-sec">⏱️ Tiempos del ciclo y pendientes</div>
+          <div class="tiles" id="dashTiempos"></div>
+          <div class="dash-grid2" style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
+            <div class="inner col"><h3 style="margin-bottom:8px">⏱️ Horas promedio por mes</h3><div style="height:260px;"><canvas id="chartCiclo"></canvas></div></div>
+            <div class="inner col"><h3 style="margin-bottom:8px">⚠️ Pendientes con más antigüedad</h3><div id="dashPendientes"></div></div>
+          </div>
+
+          <div class="dash-sec">✅ Calidad: rechazos y cargas con observaciones</div>
+          <div class="tiles" id="dashCalidad"></div>
+          <div class="dash-grid2" style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
+            <div class="inner col"><h3 style="margin-bottom:8px">% de rechazo y de cargas con obs. por área</h3><div style="height:260px;"><canvas id="chartCalidad"></canvas></div></div>
+            <div class="inner col"><h3 style="margin-bottom:8px">📝 Últimos rechazos y cargas con observación</h3><div id="dashMotivos"></div></div>
+          </div>
+
+          <div class="dash-sec">📦 Volumen: filas, material y destinos</div>
+          <div class="tiles" id="dashVolumen"></div>
+          <div class="dash-grid2" style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
+            <div class="inner col"><h3 style="margin-bottom:8px">Filas por mes y promedio por solicitud</h3><div style="height:260px;"><canvas id="chartFilas"></canvas></div></div>
+            <div class="inner col"><h3 style="margin-bottom:8px">🧪 Mix por tipo de material (unidades)</h3><div style="height:260px;"><canvas id="chartMaterial"></canvas></div></div>
+          </div>
+          <div class="inner col"><h3 style="margin-bottom:8px">🏬 Destinos que más piden (top 10 por unidades)</h3><div id="dashDestinos"></div></div>
+
           <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
             <div class="inner col"><h3 style="margin-bottom:8px">📈 Solicitudes por Mes</h3><div style="height:260px;"><canvas id="chartTemporal"></canvas></div></div>
             <div class="inner col"><h3 style="margin-bottom:8px">🍩 Distribución por Área</h3><div style="height:260px;"><canvas id="chartAreaDonut"></canvas></div></div>
@@ -1601,6 +1632,167 @@
             valor: r.u, texto: r.u.toLocaleString('es-BO') + ' u.'
           })),
         'Aún no hay SKUs solicitados.');
+
+      try { dashIndicadores(grupos, items, opcionesBase); } catch (e) { console.error('Dashboard (indicadores)', e); }
+    }
+
+    // ---- Indicadores de gestión: tiempos, pendientes, calidad, volumen ----
+    function dashIndicadores(grupos, items, opcionesBase) {
+      const horas = (a, b) => { const h = (new Date(b) - new Date(a)) / 36e5; return Number.isFinite(h) && h >= 0 ? h : null; };
+      const prom = (v) => v.length ? v.reduce((t, x) => t + x, 0) / v.length : null;
+      const mediana = (v) => { if (!v.length) return null; const o = [...v].sort((a, b) => a - b), m = Math.floor(o.length / 2); return o.length % 2 ? o[m] : (o[m - 1] + o[m]) / 2; };
+      const fmtH = (h) => h == null ? '—' : h < 1 ? Math.round(h * 60) + ' min' : h < 48 ? h.toFixed(1) + ' h' : (h / 24).toFixed(1) + ' días';
+      const pct = (a, b) => b ? (a / b * 100) : 0;
+      const fmtPct = (x) => x.toLocaleString('es-BO', { maximumFractionDigits: 1 }) + '%';
+      const tile = (l, v, c, sub) => '<div class="tile"><div class="t-l ' + c + '">' + l + '</div><div class="t-v ' + c + '">' + v + '</div>' + (sub ? '<div class="t-s">' + sub + '</div>' : '') + '</div>';
+      const claveMes = (f) => { const d = new Date(f); return isNaN(d) ? null : d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
+      const etiquetaMes = (k) => { const [y, m] = k.split('-'); return new Date(+y, +m - 1, 1).toLocaleDateString('es-BO', { month: 'short', year: '2-digit' }); };
+      const ahora = Date.now();
+
+      // ===== 1) Tiempos del ciclo (solicitudes aprobadas / cargadas) =====
+      const tAprob = [], tCarga = [], tTotal = [];
+      const mesTiempos = new Map();   // mes de la solicitud -> { a: [], c: [] }
+      grupos.forEach(g => {
+        const a = g.fecha_aprobacion ? horas(g.created_at, g.fecha_aprobacion) : null;
+        const c = (g.fecha_aprobacion && g.fecha_carga) ? horas(g.fecha_aprobacion, g.fecha_carga) : null;
+        const t = g.fecha_carga ? horas(g.created_at, g.fecha_carga) : null;
+        if (a != null) tAprob.push(a);
+        if (c != null) tCarga.push(c);
+        if (t != null) tTotal.push(t);
+        const k = claveMes(g.created_at);
+        if (k && (a != null || c != null)) {
+          const r = mesTiempos.get(k) || { a: [], c: [] };
+          if (a != null) r.a.push(a); if (c != null) r.c.push(c);
+          mesTiempos.set(k, r);
+        }
+      });
+
+      // ===== 2) Pendientes envejecidas =====
+      const abiertas = grupos
+        .filter(g => g.estado === 'PENDIENTE' || g.estado === 'APROBADO')
+        .map(g => {
+          const desde = g.estado === 'APROBADO' ? (g.fecha_aprobacion || g.created_at) : g.created_at;
+          return { g, etapa: g.estado === 'APROBADO' ? 'Sin cargar' : 'Sin aprobar', h: horas(desde, ahora) };
+        })
+        .filter(x => x.h != null)
+        .sort((a, b) => b.h - a.h);
+      const mas24 = abiertas.filter(x => x.h > 24).length, mas48 = abiertas.filter(x => x.h > 48).length;
+
+      $('dashTiempos').innerHTML =
+        tile('Aprobación (promedio)', fmtH(prom(tAprob)), 'c-blue', 'Mediana: ' + fmtH(mediana(tAprob)) + ' · ' + tAprob.length + ' solicitudes') +
+        tile('Carga (promedio)', fmtH(prom(tCarga)), 'c-purple', 'Mediana: ' + fmtH(mediana(tCarga)) + ' · ' + tCarga.length + ' solicitudes') +
+        tile('Ciclo total (promedio)', fmtH(prom(tTotal)), 'c-green', 'Mediana: ' + fmtH(mediana(tTotal)) + ' · ' + tTotal.length + ' solicitudes') +
+        tile('Abiertas > 24 h', mas24, mas24 ? 'c-orange' : 'c-green', 'Pendientes de aprobar o cargar') +
+        tile('Abiertas > 48 h', mas48, mas48 ? 'c-red' : 'c-green', 'Requieren atención');
+
+      const meses12 = [...mesTiempos.keys()].sort().slice(-12);
+      dashGrafico('chartCiclo', {
+        type: 'bar',
+        data: {
+          labels: meses12.map(etiquetaMes),
+          datasets: [
+            { label: 'Hasta aprobar (h)', data: meses12.map(k => +(prom(mesTiempos.get(k).a) || 0).toFixed(1)), backgroundColor: '#1cbcec', borderRadius: 4 },
+            { label: 'De aprobar a cargar (h)', data: meses12.map(k => +(prom(mesTiempos.get(k).c) || 0).toFixed(1)), backgroundColor: '#8b5cf6', borderRadius: 4 }
+          ]
+        },
+        options: { ...opcionesBase, plugins: { legend: { position: 'bottom' } }, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Horas' } } } }
+      });
+
+      $('dashPendientes').innerHTML = abiertas.length
+        ? '<table class="dash-tabla"><thead><tr><th>N.º</th><th>Área / Solicitante</th><th>Etapa</th><th>Antigüedad</th></tr></thead><tbody>' +
+          abiertas.slice(0, 10).map(x => '<tr><td><b>' + esc(x.g.nro) + '</b></td><td>' + esc(x.g.area || '—') + '<br><span style="color:#64748b;font-size:11.5px">' + esc(x.g.solicitante || '') + '</span></td><td>' + x.etapa + '</td>' +
+            '<td><span class="dash-pill ' + (x.h > 48 ? 'rojo' : x.h > 24 ? 'amb' : '') + '">' + fmtH(x.h) + '</span></td></tr>').join('') +
+          '</tbody></table>' + (abiertas.length > 10 ? '<div style="font-size:11.5px;color:#64748b;margin-top:6px">Mostrando 10 de ' + abiertas.length + ' abiertas.</div>' : '')
+        : '<div class="notif-vacio">No hay solicitudes pendientes. 🎉</div>';
+
+      // ===== 3) Calidad: rechazos y cargas con observaciones =====
+      const nTot = grupos.length;
+      const nRech = grupos.filter(g => g.estado === 'RECHAZADO').length;
+      const nCarg = grupos.filter(g => g.estado === 'CARGADO' || g.estado === 'CARGADO CON OBS').length;
+      const nObs = grupos.filter(g => g.estado === 'CARGADO CON OBS').length;
+      $('dashCalidad').innerHTML =
+        tile('Tasa de rechazo', fmtPct(pct(nRech, nTot)), nRech ? 'c-red' : 'c-green', nRech + ' de ' + nTot + ' solicitudes') +
+        tile('Cargadas con obs.', fmtPct(pct(nObs, nCarg)), nObs ? 'c-orange' : 'c-green', nObs + ' de ' + nCarg + ' cargadas');
+
+      const areasC = [...new Set(grupos.map(g => g.area || 'Sin área'))].sort();
+      dashGrafico('chartCalidad', {
+        type: 'bar',
+        data: {
+          labels: areasC,
+          datasets: [
+            { label: '% rechazo (sobre solicitudes)', backgroundColor: '#e11d2e', borderRadius: 4,
+              data: areasC.map(a => +pct(grupos.filter(g => (g.area || 'Sin área') === a && g.estado === 'RECHAZADO').length, grupos.filter(g => (g.area || 'Sin área') === a).length).toFixed(1)) },
+            { label: '% cargadas con obs. (sobre cargadas)', backgroundColor: '#f59e0b', borderRadius: 4,
+              data: areasC.map(a => { const c = grupos.filter(g => (g.area || 'Sin área') === a && (g.estado === 'CARGADO' || g.estado === 'CARGADO CON OBS')); return +pct(c.filter(g => g.estado === 'CARGADO CON OBS').length, c.length).toFixed(1); }) }
+          ]
+        },
+        options: { ...opcionesBase, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' } } } }
+      });
+
+      const motivos = grupos.filter(g => (g.estado === 'RECHAZADO' || g.estado === 'CARGADO CON OBS')).slice(0, 6);   // ya vienen de más reciente a más antigua
+      $('dashMotivos').innerHTML = motivos.length
+        ? '<table class="dash-tabla"><thead><tr><th>N.º</th><th>Estado</th><th>Observación de CEDIS</th></tr></thead><tbody>' +
+          motivos.map(g => '<tr><td><b>' + esc(g.nro) + '</b><br><span style="color:#64748b;font-size:11.5px">' + esc(g.area || '') + '</span></td>' +
+            '<td><span class="dash-pill ' + (g.estado === 'RECHAZADO' ? 'rojo' : 'amb') + '">' + esc(g.estado) + '</span></td>' +
+            '<td>' + (g.obs ? esc(g.obs) : '<span style="color:#94a3b8">Sin observación</span>') + '</td></tr>').join('') + '</tbody></table>'
+        : '<div class="notif-vacio">No hay rechazos ni cargas con observación.</div>';
+
+      // ===== 4) Volumen: filas por mes, tamaño promedio, material, destinos =====
+      const filasPorMes = new Map();   // mes -> { filas, sol }
+      grupos.forEach(g => {
+        const k = claveMes(g.created_at); if (!k) return;
+        const r = filasPorMes.get(k) || { filas: 0, sol: 0 };
+        r.filas += g.items.filter(i => i.estado !== 'ELIMINADO').length; r.sol++;
+        filasPorMes.set(k, r);
+      });
+      const totalFilas = items.length;
+      const udsSol = grupos.length ? items.reduce((t, i) => t + (Number(i.cantidad) || 0), 0) / grupos.length : 0;
+      const mesActual = claveMes(new Date());
+      const rAct = filasPorMes.get(mesActual) || { filas: 0, sol: 0 };
+      $('dashVolumen').innerHTML =
+        tile('Filas este mes', rAct.filas.toLocaleString('es-BO'), 'c-blue', rAct.sol + (rAct.sol === 1 ? ' solicitud' : ' solicitudes')) +
+        tile('Filas en total', totalFilas.toLocaleString('es-BO'), 'c-purple', 'Todas las solicitudes') +
+        tile('Filas por solicitud', (grupos.length ? totalFilas / grupos.length : 0).toLocaleString('es-BO', { maximumFractionDigits: 1 }), 'c-green', 'Promedio') +
+        tile('Unidades por solicitud', Math.round(udsSol).toLocaleString('es-BO'), 'c-orange', 'Promedio');
+
+      const mesesF = [...filasPorMes.keys()].sort().slice(-12);
+      dashGrafico('chartFilas', {
+        type: 'bar',
+        data: {
+          labels: mesesF.map(etiquetaMes),
+          datasets: [
+            { type: 'bar', label: 'Filas del mes', data: mesesF.map(k => filasPorMes.get(k).filas), backgroundColor: '#1cbcec', borderRadius: 6, yAxisID: 'y' },
+            { type: 'line', label: 'Filas por solicitud (prom.)', data: mesesF.map(k => +(filasPorMes.get(k).filas / filasPorMes.get(k).sol).toFixed(1)), borderColor: '#0b3a5b', backgroundColor: '#0b3a5b', tension: .3, yAxisID: 'y1' }
+          ]
+        },
+        options: { ...opcionesBase, plugins: { legend: { position: 'bottom' } }, scales: {
+          y: { beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: 'Filas' } },
+          y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Prom. por solicitud' } } } }
+      });
+
+      const porMaterial = new Map();
+      items.forEach(i => {
+        const t = tipoMaterialDe(i.sku); const k = t === '—' ? 'Sin tipo' : t;
+        porMaterial.set(k, (porMaterial.get(k) || 0) + (Number(i.cantidad) || 0));
+      });
+      const materiales = [...porMaterial.keys()].sort((a, b) => porMaterial.get(b) - porMaterial.get(a));
+      dashGrafico('chartMaterial', {
+        type: 'doughnut',
+        data: { labels: materiales, datasets: [{ data: materiales.map(m => porMaterial.get(m)), backgroundColor: materiales.map((_, n) => PALETA_AREAS[n % PALETA_AREAS.length]) }] },
+        options: { ...opcionesBase, plugins: { legend: { position: 'right' } } }
+      });
+
+      const porDestino = new Map();
+      items.forEach(i => {
+        const k = String(i.destino || '').trim(); if (!k) return;
+        const r = porDestino.get(k) || { u: 0, n: new Set(), f: 0 };
+        r.u += Number(i.cantidad) || 0; r.f++; r.n.add(i.nro_solicitud != null ? i.nro_solicitud : i.solicitud_id);
+        porDestino.set(k, r);
+      });
+      $('dashDestinos').innerHTML = dashBarras(
+        [...porDestino.entries()].sort((a, b) => b[1].u - a[1].u).slice(0, 10)
+          .map(([dest, r]) => ({ titulo: esc(dest), sub: r.n.size + (r.n.size === 1 ? ' solicitud' : ' solicitudes') + ' · ' + r.f + (r.f === 1 ? ' fila' : ' filas'), valor: r.u, texto: r.u.toLocaleString('es-BO') + ' u.' })),
+        'Aún no hay destinos.');
     }
 
     // ---- Notificaciones (campana) ----
