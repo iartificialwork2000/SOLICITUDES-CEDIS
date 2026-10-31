@@ -628,7 +628,7 @@
         </div>
       </section>
     </main>
-    <footer class="foot">Registro de Solicitudes· CEDIS SCZ - LPZ (Desarrollado por Ivan Callau con apoyo del equipo cedis)</footer>
+    <footer class="foot">Registro de Solicitudes· CEDIS La Paz(DESARROLADO POR EL EQUIPO CEIDS)</footer>
   </div>
 
   <script>
@@ -1015,6 +1015,7 @@
     }
     // ===== Nombres de sucursales destino (tabla sucursales: tran, suc, nombre) =====
     let sucursalesMapa = null, sucursalesPromesa = null;
+    let sucursalesError = '';   // motivo por el que no se pudieron leer los nombres (para avisar en el dashboard)
     function asegurarSucursales() {
       if (sucursalesMapa) return Promise.resolve(sucursalesMapa);
       if (sucursalesPromesa) return sucursalesPromesa;
@@ -1573,7 +1574,10 @@
       let datos;
       try {
         datos = await DB.listar('TODOS');
-        await Promise.all([asegurarMaestro().catch(() => {}), asegurarSucursales().catch(() => {})]);   // nombres de SKU y de sucursales
+        await Promise.all([
+          asegurarMaestro().catch(() => {}),
+          asegurarSucursales().then(() => { sucursalesError = ''; }).catch(e => { sucursalesError = (e && e.message) || String(e); })
+        ]);   // nombres de SKU y de sucursales
       } catch (e) {
         console.error('Dashboard', e);
         tiles.innerHTML = '<div class="notif-vacio" style="grid-column:1/-1">No se pudieron cargar los datos del dashboard. Pulsa “Actualizar datos” o recarga la página.</div>';
@@ -1816,7 +1820,11 @@
       });
       const topDest = [...porDestino.entries()].sort((a, b) => b[1].u - a[1].u).slice(0, 10);
       const maxU = Math.max(...topDest.map(([, r]) => r.u), 1);
-      $('dashDestinos').innerHTML = topDest.length
+      const avisoSuc = sucursalesError
+        ? '<div class="det-note obs" style="margin-bottom:8px"><div><b>No se pudo leer la tabla “sucursales” de Supabase:</b> ' + esc(sucursalesError) + '. Revisa que la tabla exista y tenga permiso de lectura.</div></div>'
+        : (sucursalesMapa && sucursalesMapa.size === 0
+          ? '<div class="det-note obs" style="margin-bottom:8px"><div>La tabla “sucursales” está vacía: importa el CSV con los nombres en Supabase.</div></div>' : '');
+      $('dashDestinos').innerHTML = avisoSuc + (topDest.length
         ? '<div class="dest-head"><span></span><span>Sucursal destino</span><span>Solicitudes</span><span>Filas</span><span>Unidades</span></div>' +
           topDest.map(([dest, r], n) => {
             const nom = nombreDestino(dest);
@@ -1828,7 +1836,7 @@
               '<span class="dest-n">' + r.f.toLocaleString('es-BO') + '</span>' +
               '<span class="dest-n u">' + r.u.toLocaleString('es-BO') + '</span></div>';
           }).join('')
-        : '<div class="notif-vacio">Aún no hay destinos.</div>';
+        : '<div class="notif-vacio">Aún no hay destinos.</div>');
     }
 
     // ---- Notificaciones (campana) ----
