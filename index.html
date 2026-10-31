@@ -170,6 +170,20 @@
     .dash-tabla td { padding: 7px 8px; border-bottom: 1px solid #edf4fa; color: var(--navy); vertical-align: top; }
     .dash-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-weight: 800; font-size: 11.5px; background: #e6f4fd; color: var(--blue); white-space: nowrap; }
     .dash-pill.amb { background: #fff4d6; color: #b45309; } .dash-pill.rojo { background: #fde2e4; color: #c01028; }
+    .dest-head, .dest-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) 84px 84px 96px; gap: 10px; align-items: center; }
+    .dest-head { padding: 0 6px 6px; font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: #64748b; border-bottom: 1px solid #e3eef7; }
+    .dest-head span:nth-child(n+3), .dest-row .dest-n { text-align: center; }
+    .dest-row { padding: 9px 6px; border-bottom: 1px solid #edf4fa; }
+    .dest-row:nth-child(even) { background: #f8fcff; }
+    .dest-pos { text-align: center; font-weight: 800; color: #8aa0b2; }
+    .dest-nom { font-size: 13.5px; font-weight: 800; color: var(--navy); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dest-nom.sin { color: #94a3b8; font-weight: 700; font-style: italic; }
+    .dest-cod { font-size: 11.5px; color: #64748b; margin-top: 1px; }
+    .dest-bar { height: 6px; border-radius: 999px; background: #e6f4fd; margin-top: 5px; }
+    .dest-bar > i { display: block; height: 6px; border-radius: 999px; background: #1cbcec; }
+    .dest-n { font-size: 16px; font-weight: 800; color: var(--navy); }
+    .dest-n.u { color: var(--blue); font-size: 17px; }
+    @media (max-width: 640px) { .dest-head, .dest-row { grid-template-columns: 22px minmax(0, 1fr) 56px 56px 70px; gap: 6px; } .dest-n { font-size: 14px; } }
     @media (max-width: 800px) { .dash-grid2 { grid-template-columns: 1fr !important; } }
 
     .tbl-wrap { background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(0, 60, 100, .1); }
@@ -1002,6 +1016,29 @@
       })().catch(err => { maestroPromesa = null; throw err; });
       return maestroPromesa;
     }
+    // ===== Nombres de sucursales destino (tabla sucursales: tran, suc, nombre) =====
+    let sucursalesMapa = null, sucursalesPromesa = null;
+    function asegurarSucursales() {
+      if (sucursalesMapa) return Promise.resolve(sucursalesMapa);
+      if (sucursalesPromesa) return sucursalesPromesa;
+      sucursalesPromesa = (async () => {
+        const mapa = new Map();
+        for (let desde = 0, PAG = 1000; ; desde += PAG) {
+          const { data, error } = await sb.from('sucursales').select('tran,suc,nombre').order('tran').range(desde, desde + PAG - 1);
+          if (error) throw error;
+          (data || []).forEach(r => {
+            const nom = String(r.nombre || '').trim(); if (!nom) return;
+            mapa.set(String(r.tran).trim(), nom);
+            if (r.suc) mapa.set(String(r.suc).trim(), nom);   // por si algún destino quedó con el código de sucursal
+          });
+          if (!data || data.length < PAG) break;
+        }
+        sucursalesMapa = mapa; return mapa;
+      })().catch(err => { sucursalesPromesa = null; throw err; });
+      return sucursalesPromesa;
+    }
+    function nombreDestino(cod) { return (sucursalesMapa && sucursalesMapa.get(String(cod || '').trim())) || ''; }
+
     function tipoMaterialDe(sku) {
       const reg = maestroMultiplos && maestroMultiplos.get(String(sku || '').trim());
       return (reg && reg.tipo_material) || '—';
@@ -1539,7 +1576,7 @@
       let datos;
       try {
         datos = await DB.listar('TODOS');
-        await asegurarMaestro().catch(() => {});   // para mostrar el nombre de los SKU
+        await Promise.all([asegurarMaestro().catch(() => {}), asegurarSucursales().catch(() => {})]);   // nombres de SKU y de sucursales
       } catch (e) {
         console.error('Dashboard', e);
         tiles.innerHTML = '<div class="notif-vacio" style="grid-column:1/-1">No se pudieron cargar los datos del dashboard. Pulsa “Actualizar datos” o recarga la página.</div>';
@@ -1789,10 +1826,21 @@
         r.u += Number(i.cantidad) || 0; r.f++; r.n.add(i.nro_solicitud != null ? i.nro_solicitud : i.solicitud_id);
         porDestino.set(k, r);
       });
-      $('dashDestinos').innerHTML = dashBarras(
-        [...porDestino.entries()].sort((a, b) => b[1].u - a[1].u).slice(0, 10)
-          .map(([dest, r]) => ({ titulo: esc(dest), sub: r.n.size + (r.n.size === 1 ? ' solicitud' : ' solicitudes') + ' · ' + r.f + (r.f === 1 ? ' fila' : ' filas'), valor: r.u, texto: r.u.toLocaleString('es-BO') + ' u.' })),
-        'Aún no hay destinos.');
+      const topDest = [...porDestino.entries()].sort((a, b) => b[1].u - a[1].u).slice(0, 10);
+      const maxU = Math.max(...topDest.map(([, r]) => r.u), 1);
+      $('dashDestinos').innerHTML = topDest.length
+        ? '<div class="dest-head"><span></span><span>Sucursal destino</span><span>Solicitudes</span><span>Filas</span><span>Unidades</span></div>' +
+          topDest.map(([dest, r], n) => {
+            const nom = nombreDestino(dest);
+            return '<div class="dest-row"><span class="dest-pos">' + (n + 1) + '</span>' +
+              '<div style="min-width:0"><div class="dest-nom' + (nom ? '' : ' sin') + '" title="' + esc(nom) + '">' + esc(nom || 'Sin nombre registrado') + '</div>' +
+              '<div class="dest-cod">Cód. <span class="sku-chip">' + esc(dest) + '</span></div>' +
+              '<div class="dest-bar"><i style="width:' + Math.max(3, Math.round(r.u / maxU * 100)) + '%"></i></div></div>' +
+              '<span class="dest-n">' + r.n.size.toLocaleString('es-BO') + '</span>' +
+              '<span class="dest-n">' + r.f.toLocaleString('es-BO') + '</span>' +
+              '<span class="dest-n u">' + r.u.toLocaleString('es-BO') + '</span></div>';
+          }).join('')
+        : '<div class="notif-vacio">Aún no hay destinos.</div>';
     }
 
     // ---- Notificaciones (campana) ----
@@ -2055,6 +2103,7 @@
       })();
       agregarFilaTabla();
       asegurarMaestro().catch(() => {});
+      asegurarSucursales().catch(() => {});
       
       $('btnCargarFilas').addEventListener('click', procesarTextoPegado);
       $('btnAgregarFila').addEventListener('click', () => agregarFilaTabla());
