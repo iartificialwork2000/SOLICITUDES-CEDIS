@@ -959,7 +959,8 @@
         const mapa = new Map(); const PAG = 1000;
         for (let desde = 0; ; desde += PAG) {
           const consulta = (cols) => sb.from('maestro_multiplos').select(cols).order('id_producto').range(desde, desde + PAG - 1);
-          let { data, error } = await consulta('id_producto,multiplo_scz,multiplo_lpz,tipo_material');
+          let { data, error } = await consulta('id_producto,producto,multiplo_scz,multiplo_lpz,tipo_material');
+          if (error) ({ data, error } = await consulta('id_producto,multiplo_scz,multiplo_lpz,tipo_material'));  // por si aún no existe producto
           if (error) ({ data, error } = await consulta('id_producto,multiplo_scz,multiplo_lpz'));  // por si aún no existe tipo_material
           if (error) throw error;
           data.forEach(r => mapa.set(String(r.id_producto), r));
@@ -973,6 +974,10 @@
     function tipoMaterialDe(sku) {
       const reg = maestroMultiplos && maestroMultiplos.get(String(sku || '').trim());
       return (reg && reg.tipo_material) || '—';
+    }
+    function nombreSkuDe(sku) {
+      const reg = maestroMultiplos && maestroMultiplos.get(String(sku || '').trim());
+      return (reg && reg.producto) || '—';
     }
     function errorFila(origen, sku, cantidad) {
       const col = ORIGEN_COL[normOrigen(origen)];
@@ -1194,6 +1199,7 @@
           <td><span class="sku-chip">${esc(i.sku)}</span></td>
           <td class="c qty">${esc(i.cantidad ?? 0)}</td>
           <td>${esc(tipoMaterialDe(i.sku))}</td>
+          <td>${esc(nombreSkuDe(i.sku))}</td>
         </tr>`).join('');
       const total = g.items.reduce((s, i) => s + (Number(i.cantidad) || 0), 0);
       return `
@@ -1214,6 +1220,7 @@
                   <th>SKU</th>
                   <th class="c">CANTIDAD</th>
                   <th>TIPO MATERIAL</th>
+                  <th>NOMBRE SKU</th>
                 </tr>
               </thead>
               <tbody>${filas}</tbody>
@@ -1221,6 +1228,7 @@
                 <tr>
                   <td colspan="4" style="text-align:right">Total unidades</td>
                   <td class="c"><span class="total-pill">${total.toLocaleString('es-BO')}</span></td>
+                  <td></td>
                   <td></td>
                 </tr>
               </tfoot>
@@ -1467,8 +1475,132 @@
       if (abre) expandidos.add(head.dataset.key); else expandidos.delete(head.dataset.key);
     }
 
+    // ---- Dashboard: los datos salen de la tabla solicitudes de Supabase (las eliminadas no cuentan) ----
+    const dashCharts = {};
+    const ESTADO_COLOR = { 'PENDIENTE': '#f59e0b', 'APROBADO': '#1cbcec', 'RECHAZADO': '#e11d2e', 'CARGADO': '#16a34a', 'CARGADO CON OBS': '#8b5cf6' };
+    const PALETA_AREAS = ['#1cbcec', '#0b3a5b', '#16a34a', '#f59e0b', '#8b5cf6', '#e11d2e', '#14b8a6', '#ec4899', '#64748b'];
+
+    function dashGrafico(id, cfg) {
+      if (dashCharts[id]) { dashCharts[id].destroy(); delete dashCharts[id]; }
+      const cv = $(id);
+      if (!cv || typeof Chart === 'undefined') return;
+      dashCharts[id] = new Chart(cv, cfg);
+    }
+    function dashBarras(filas, vacio) {
+      if (!filas.length) return '<div class="notif-vacio">' + vacio + '</div>';
+      const max = Math.max(...filas.map(f => f.valor), 1);
+      return '<div style="display:flex;flex-direction:column;gap:10px">' + filas.map((f, n) =>
+        '<div style="display:flex;align-items:center;gap:10px">' +
+          '<span style="flex:none;width:22px;text-align:center;font-weight:800;color:#8aa0b2">' + (n + 1) + '</span>' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="display:flex;justify-content:space-between;gap:10px;font-size:13px;font-weight:700">' +
+              '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + f.titulo + '</span>' +
+              '<span style="flex:none">' + esc(f.texto) + '</span></div>' +
+            (f.sub ? '<div style="font-size:11.5px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + f.sub + '</div>' : '') +
+            '<div style="height:7px;border-radius:999px;background:#e6f4fd;margin-top:4px"><div style="height:7px;border-radius:999px;background:#1cbcec;width:' + Math.max(3, Math.round(f.valor / max * 100)) + '%"></div></div>' +
+          '</div></div>').join('') + '</div>';
+    }
+
     async function cargarDashboard() {
       if (!puede('ver_dashboard')) return;
+      const tiles = $('dashTiles');
+      tiles.innerHTML = '<div class="notif-vacio" style="grid-column:1/-1">Cargando datos…</div>';
+      let datos;
+      try {
+        datos = await DB.listar('TODOS');
+        await asegurarMaestro().catch(() => {});   // para mostrar el nombre de los SKU
+      } catch (e) {
+        console.error('Dashboard', e);
+        tiles.innerHTML = '<div class="notif-vacio" style="grid-column:1/-1">No se pudieron cargar los datos del dashboard. Pulsa “Actualizar datos” o recarga la página.</div>';
+        return;
+      }
+      const todos = agrupar(datos);
+      const grupos = todos.filter(g => g.estado !== 'ELIMINADO');
+      const items = datos.filter(i => i.estado !== 'ELIMINADO');
+      const cuenta = (...ests) => grupos.filter(g => ests.includes(g.estado)).length;
+      const unidades = items.reduce((t, i) => t + (Number(i.cantidad) || 0), 0);
+
+      const tile = (l, v, c) => '<div class="tile"><div class="t-l ' + c + '">' + l + '</div><div class="t-v ' + c + '">' + v + '</div></div>';
+      tiles.innerHTML =
+        tile('Solicitudes', grupos.length.toLocaleString('es-BO'), 'c-blue') +
+        tile('Pendientes', cuenta('PENDIENTE').toLocaleString('es-BO'), 'c-orange') +
+        tile('Aprobadas', cuenta('APROBADO').toLocaleString('es-BO'), 'c-purple') +
+        tile('Cargadas', cuenta('CARGADO', 'CARGADO CON OBS').toLocaleString('es-BO'), 'c-green') +
+        tile('Rechazadas', cuenta('RECHAZADO').toLocaleString('es-BO'), 'c-red') +
+        tile('Unidades', unidades.toLocaleString('es-BO'), 'c-blue');
+
+      const opcionesBase = { responsive: true, maintainAspectRatio: false };
+
+      // 1) Solicitudes por mes (últimos 12 meses con datos)
+      const porMes = new Map();
+      grupos.forEach(g => {
+        const d = new Date(g.created_at); if (isNaN(d)) return;
+        const k = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+        porMes.set(k, (porMes.get(k) || 0) + 1);
+      });
+      const meses = [...porMes.keys()].sort().slice(-12);
+      dashGrafico('chartTemporal', {
+        type: 'bar',
+        data: {
+          labels: meses.map(k => { const [y, m] = k.split('-'); return new Date(+y, +m - 1, 1).toLocaleDateString('es-BO', { month: 'short', year: '2-digit' }); }),
+          datasets: [{ label: 'Solicitudes', data: meses.map(k => porMes.get(k)), backgroundColor: '#1cbcec', borderRadius: 6 }]
+        },
+        options: { ...opcionesBase, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+      });
+
+      // 2) Distribución por área
+      const porArea = new Map();
+      grupos.forEach(g => { const a = g.area || 'Sin área'; porArea.set(a, (porArea.get(a) || 0) + 1); });
+      const areas = [...porArea.keys()].sort((a, b) => porArea.get(b) - porArea.get(a));
+      dashGrafico('chartAreaDonut', {
+        type: 'doughnut',
+        data: { labels: areas, datasets: [{ data: areas.map(a => porArea.get(a)), backgroundColor: areas.map((_, n) => PALETA_AREAS[n % PALETA_AREAS.length]) }] },
+        options: { ...opcionesBase, plugins: { legend: { position: 'right' } } }
+      });
+
+      // 3) Área y estado (barras apiladas)
+      const estadosGraf = ESTADOS.filter(e => e !== 'ELIMINADO');
+      dashGrafico('chartStackedArea', {
+        type: 'bar',
+        data: {
+          labels: areas,
+          datasets: estadosGraf.map(e => ({
+            label: e, backgroundColor: ESTADO_COLOR[e],
+            data: areas.map(a => grupos.filter(g => (g.area || 'Sin área') === a && g.estado === e).length)
+          }))
+        },
+        options: { ...opcionesBase, plugins: { legend: { position: 'bottom' } }, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } } }
+      });
+
+      // 4) Top solicitantes
+      const porSol = new Map();
+      grupos.forEach(g => {
+        const k = g.solicitante || 'Sin nombre';
+        const r = porSol.get(k) || { n: 0, u: 0 };
+        r.n++; r.u += g.items.reduce((t, i) => t + (Number(i.cantidad) || 0), 0);
+        porSol.set(k, r);
+      });
+      $('dashTopSolicitantes').innerHTML = dashBarras(
+        [...porSol.entries()].sort((a, b) => b[1].n - a[1].n || b[1].u - a[1].u).slice(0, 8)
+          .map(([nombre, r]) => ({ titulo: esc(nombre), sub: r.u.toLocaleString('es-BO') + ' unidades', valor: r.n, texto: r.n + (r.n === 1 ? ' solicitud' : ' solicitudes') })),
+        'Aún no hay solicitudes.');
+
+      // 5) Top 5 SKUs por unidades
+      const porSku = new Map();
+      items.forEach(i => {
+        const k = String(i.sku || '').trim(); if (!k) return;
+        const r = porSku.get(k) || { u: 0, n: new Set() };
+        r.u += Number(i.cantidad) || 0; r.n.add(i.nro_solicitud != null ? i.nro_solicitud : i.solicitud_id);
+        porSku.set(k, r);
+      });
+      $('dashSkuContainer').innerHTML = dashBarras(
+        [...porSku.entries()].sort((a, b) => b[1].u - a[1].u).slice(0, 5)
+          .map(([sku, r]) => ({
+            titulo: '<span class="sku-chip">' + esc(sku) + '</span> ' + esc(nombreSkuDe(sku) === '—' ? '' : nombreSkuDe(sku)),
+            sub: 'En ' + r.n.size + (r.n.size === 1 ? ' solicitud' : ' solicitudes'),
+            valor: r.u, texto: r.u.toLocaleString('es-BO') + ' u.'
+          })),
+        'Aún no hay SKUs solicitados.');
     }
 
     // ---- Notificaciones (campana) ----
@@ -1711,6 +1843,7 @@
       verificarSesion().then(() => { if (usuarioActual && !puede('crear')) cambiarTab(tabInicial()); });
       $('btnBell').addEventListener('click', (e) => { e.stopPropagation(); abrirNotificaciones(); });
       $('btnNotifTodas').addEventListener('click', marcarTodasLeidas);
+      $('btnActualizarDash').addEventListener('click', cargarDashboard);
       $('notifPanel').addEventListener('click', (e) => {
         e.stopPropagation();
         const item = e.target.closest('.notif-item');
