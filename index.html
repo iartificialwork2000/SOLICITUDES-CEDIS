@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0794d8">
-  <title>Registro de Solicitudes · CEDIS SCZ - LPZ </title>
+  <title>Registro de Solicitudes · CEDIS La Paz</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -140,6 +140,22 @@
     .inner { background: #fff; border-radius: 16px; padding: 16px; box-shadow: 0 1px 2px rgba(0, 60, 100, .1); }
     .inner h3 { margin: 0 0 4px; font-size: 14px; font-weight: 800; color: var(--navy); }
     .inner .hint { margin: 0 0 10px; font-size: 12px; color: #4b6478; }
+    /* Tarjeta 1 (Registrar): versión compacta */
+    .card-mini { padding-bottom: 12px; border-radius: 18px; }
+    .card-mini .card-h { padding: 9px 16px; gap: 10px; }
+    .card-mini .step { width: 24px; height: 24px; border-radius: 7px; font-size: 13px; }
+    .card-mini .card-h h2 { font-size: 15px; min-width: 0; }
+    .card-mini .chip { font-size: 10px; padding: 4px 10px; background: rgba(255, 255, 255, .85); }
+    .card-mini .card-b { padding: 10px 14px 0; }
+    .reg-mini { display: grid; grid-template-columns: 1fr 1.4fr; gap: 16px; padding: 12px 14px; border-radius: 14px; }
+    .reg-mini .lbl { margin-bottom: 4px; font-size: 10.5px; }
+    .reg-mini .lbl-sub { margin-left: 6px; font-weight: 700; letter-spacing: 0; text-transform: none; color: #64748b; }
+    .reg-mini > div { min-width: 0; }
+    .reg-mini .fld { box-sizing: border-box; height: 58px; padding: 7px 10px; font-size: 13px; border-radius: 10px; resize: vertical; min-height: 0; }
+    .reg-paste { display: flex; gap: 8px; align-items: stretch; }
+    .reg-paste .fld { flex: 1; }
+    .reg-paste .btn { padding: 0 14px; font-size: 12.5px; white-space: nowrap; }
+    @media (max-width: 760px) { .reg-mini { grid-template-columns: 1fr; gap: 10px; } .card-mini .card-h h2 { min-width: 140px; } .card-mini .chip { flex-basis: 100%; text-align: center; white-space: normal; } }
     .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
     .lbl { display: block; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--navy); margin-bottom: 6px; }
@@ -442,42 +458,28 @@
       <!-- ================= REGISTRAR ================= -->
       <section id="sec-registro" class="tab-content">
         <form id="solicitudForm" class="form-col" style="display:flex; flex-direction:column; gap:20px;">
-          <div class="card">
+          <div class="card card-mini">
             <div class="card-h">
               <span class="step">1</span>
               <h2>Datos de la solicitud</h2>
-              <span class="chip">Excel opcional (Conversión SUC a TRAN automática)</span>
+              <span class="chip">Excel opcional · SUC → TRAN automático</span>
             </div>
             <div class="card-b">
-              <div class="grid2" style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
-                <div class="inner col" style="display:flex; flex-direction:column; gap:12px;">
-                  <div class="g2">
-                    <div>
-                      <label class="lbl" for="area">Área de origen *</label>
-                      <select id="area" required class="fld">
-                        <option value="">Selecciona un área</option>
-                        <option value="Compras">Compras</option>
-                        <option value="Inventarios">Inventarios</option>
-                        <option value="Ventas">Ventas</option>
-                        <option value="Operaciones">Operaciones</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label class="lbl" for="solicitante">Nombre del solicitante *</label>
-                      <input type="text" id="solicitante" required placeholder="Ej. Juan Pérez" class="fld">
-                    </div>
-                  </div>
-                  <label class="lbl" for="comentario">Comentarios / observaciones adicionales</label>
-                  <textarea id="comentario" rows="4" placeholder="Aclaraciones o notas para el equipo del CEDIS..." class="fld"></textarea>
+              <div class="inner reg-mini">
+                <!-- Área y solicitante salen siempre del perfil del usuario: no se muestran ni se editan -->
+                <input type="hidden" id="area">
+                <input type="hidden" id="solicitante">
+                <div>
+                  <label class="lbl" for="comentario">Comentarios (opcional)</label>
+                  <textarea id="comentario" rows="2" placeholder="Aclaraciones para el equipo del CEDIS..." class="fld"></textarea>
                 </div>
-                <div class="inner col" style="display:flex; flex-direction:column; gap:12px;">
-                  <h3>📋 Pegar datos desde Excel</h3>
-                  <p class="hint">Copia tus filas y pégalas aquí. Orden: <strong>ORIGEN | DESTINO | SKU | CANTIDAD</strong>.</p>
-                  <textarea id="pasteArea" rows="4" placeholder="Pega aquí los datos de Excel..." class="fld mono"></textarea>
-                  <div style="display:flex; gap:8px; align-items:center;">
+                <div>
+                  <label class="lbl" for="pasteArea">Pegar desde Excel <span class="lbl-sub">Origen | Destino | SKU | Cantidad</span></label>
+                  <div class="reg-paste">
+                    <textarea id="pasteArea" rows="2" placeholder="Pega aquí las filas de Excel..." class="fld mono"></textarea>
                     <button type="button" id="btnCargarFilas" class="btn btn-navy">Cargar filas</button>
-                    <span id="pasteInfo" class="text-xs"></span>
                   </div>
+                  <span id="pasteInfo" class="text-xs"></span>
                 </div>
               </div>
             </div>
@@ -762,22 +764,12 @@
       return data || null;
     }
 
+    // Área y solicitante se toman siempre del perfil: ningún usuario puede cambiarlos desde la pantalla
     function aplicarPerfilAlFormulario() {
       const selArea = $('area'), inpNom = $('solicitante');
       if (!selArea || !inpNom) return;
-      const bloquear = rolActual === 'solicitante';
-      const area = perfilActual && perfilActual.area ? String(perfilActual.area).trim() : '';
-      const nombre = perfilActual && perfilActual.nombre ? String(perfilActual.nombre).trim() : '';
-      if (area) {
-        const existe = Array.from(selArea.options).find(o => o.value.toLowerCase() === area.toLowerCase());
-        if (existe) { selArea.value = existe.value; }
-        else { selArea.add(new Option(area, area)); selArea.value = area; }
-        selArea.disabled = bloquear; selArea.classList.toggle('auto-lock', bloquear);
-      }
-      if (nombre) {
-        inpNom.value = nombre;
-        inpNom.readOnly = bloquear; inpNom.classList.toggle('auto-lock', bloquear);
-      }
+      selArea.value = perfilActual && perfilActual.area ? String(perfilActual.area).trim() : '';
+      inpNom.value = perfilActual && perfilActual.nombre ? String(perfilActual.nombre).trim() : '';
     }
 
     async function cargarPerfilUsuario() {
@@ -1170,6 +1162,10 @@
       e.preventDefault();
       const btn = $('btnSubmit'); const msg = $('mensaje'); msg.classList.add('hidden');
       const area = $('area').value; const solicitante = $('solicitante').value.trim(); const comentario = $('comentario').value.trim();
+      if (!area || !solicitante) {
+        msg.textContent = 'Tu perfil no tiene área o nombre asignado. Avisa al administrador para completarlo antes de enviar solicitudes.';
+        msg.className = 'p-3 rounded text-sm text-center font-semibold bg-red-100 text-red-700 block'; return;
+      }
       const idSol = 'SOL-' + Date.now().toString(36).toUpperCase();
       const datos = [];
       document.querySelectorAll('#tablaCuerpo .fila-tarea').forEach(tr => {
