@@ -1326,7 +1326,7 @@
               <input type="text" class="inp-obs fld fld-sm" value="${esc(g.obs)}" placeholder="Observación CEDIS..." ${sinAcciones ? 'disabled' : ''}>
               <div class="act-btns">
                 <button type="button" class="btn-guardar btn-mini btn-navy" data-key="${esc(g.key)}" ${sinAcciones ? 'disabled' : ''}>${SVG_SAVE} Guardar</button>
-                ${puede('copiar') && (g.estado === 'APROBADO' || esCargado(g.estado)) ? `<button type="button" class="btn-copiar btn-mini btn-green" data-key="${esc(g.key)}" title="Copia filas">${SVG_COPY} Copiar</button>` : ''}
+                ${puede('copiar') && (g.estado === 'APROBADO' || esCargado(g.estado)) ? `<button type="button" class="btn-copiar btn-mini btn-green" data-key="${esc(g.key)}" title="Copia filas (Origen, Destino, SKU, Cantidad, Tipo material)">${SVG_COPY} Copiar</button>` : ''}
               </div>
             </div>
           </td>`;
@@ -1504,7 +1504,7 @@
     async function copiarGrupo(btn) {
       const g = gruposCedis.get(btn.dataset.key);
       if (!g) return;
-      const texto = g.items.map(i => [i.origen, i.destino, i.sku, i.cantidad].join('\t')).join('\r\n');
+      const texto = g.items.map(i => [i.origen, i.destino, i.sku, i.cantidad, tipoMaterialDe(i.sku)].join('\t')).join('\r\n');
       let ok = false;
       try { await navigator.clipboard.writeText(texto); ok = true; } catch (e) {}
       if (!ok) {
