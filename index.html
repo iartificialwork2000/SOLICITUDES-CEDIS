@@ -287,7 +287,7 @@
     .btn-delete-sol { background: #e11d2e; color: #fff; border: 0; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; transition: opacity .15s; display: inline-flex; align-items: center; gap: 4px; }
     .btn-delete-sol:hover { opacity: 0.9; }
     .foot { text-align: center; font-size: 12px; color: #6b8094; padding: 16px 0; }
-    #tablaCuerpo tr.fila-error input.sku, #tablaCuerpo tr.fila-error input.cantidad, #tablaCuerpo tr.fila-error input.origen { border-color:#dc2626 !important; background:#fef2f2 !important; }
+    #tablaCuerpo tr.fila-error input.sku, #tablaCuerpo tr.fila-error input.cantidad, #tablaCuerpo tr.fila-error input.origen, #tablaCuerpo tr.fila-error input.destino { border-color:#dc2626 !important; background:#fef2f2 !important; }
     #errMultiplos { display:none; margin:0 0 10px; padding:10px 12px; border:1px solid #fca5a5; background:#fef2f2; color:#991b1b; border-radius:8px; font-size:12px; font-weight:600; line-height:1.5; }
     #errMultiplos ul { margin:6px 0 0 18px; padding:0; list-style:disc; font-weight:500; }
 
@@ -1007,23 +1007,27 @@
     }
     // ===== Nombres de sucursales destino (tabla sucursales: tran, suc, nombre) =====
     let sucursalesMapa = null, sucursalesPromesa = null;
+    let sucursalesCodigos = null;   // Set con todos los códigos válidos de destino (tran y suc) de la tabla sucursales
     let sucursalesError = '';   // motivo por el que no se pudieron leer los nombres (para avisar en el dashboard)
     function asegurarSucursales() {
       if (sucursalesMapa) return Promise.resolve(sucursalesMapa);
       if (sucursalesPromesa) return sucursalesPromesa;
       sucursalesPromesa = (async () => {
-        const mapa = new Map();
+        const mapa = new Map(); const codigos = new Set();
         for (let desde = 0, PAG = 1000; ; desde += PAG) {
           const { data, error } = await sb.from('sucursales').select('tran,suc,nombre').order('tran').range(desde, desde + PAG - 1);
           if (error) throw error;
           (data || []).forEach(r => {
+            if (r.tran) codigos.add(String(r.tran).trim().toUpperCase());
+            if (r.suc) codigos.add(String(r.suc).trim().toUpperCase());
             const nom = String(r.nombre || '').trim(); if (!nom) return;
             mapa.set(String(r.tran).trim(), nom);
             if (r.suc) mapa.set(String(r.suc).trim(), nom);   // por si algún destino quedó con el código de sucursal
           });
           if (!data || data.length < PAG) break;
         }
-        sucursalesMapa = mapa; return mapa;
+        if (codigos.size === 0) throw new Error('Tabla sucursales vacía o sin permiso de lectura');
+        sucursalesCodigos = codigos; sucursalesMapa = mapa; return mapa;
       })().catch(err => { sucursalesPromesa = null; throw err; });
       return sucursalesPromesa;
     }
@@ -1037,31 +1041,38 @@
       const reg = maestroMultiplos && maestroMultiplos.get(String(sku || '').trim());
       return (reg && reg.producto) || '—';
     }
-    function errorFila(origen, sku, cantidad) {
+    const ORIGENES_VALIDOS = '5499 o 15497';
+    function errorFila(origen, destino, sku, cantidad) {
+      const errs = [];
       const col = ORIGEN_COL[normOrigen(origen)];
-      if (!col || !sku) return '';
-      const reg = maestroMultiplos.get(String(sku).trim());
-      if (!reg) return 'SKU ' + sku + ': no existe en el maestro de múltiplos';
-      const m = reg[col];
-      const c = Number(cantidad);
-      if (!m) return '';
-      if (!Number.isFinite(c) || c <= 0 || c % m !== 0) return 'SKU ' + sku + ': cantidad ' + (cantidad === '' ? '(vacía)' : cantidad) + ' debe ser múltiplo de ' + m;
-      return '';
+      if (!col) errs.push('Origen ' + (String(origen || '').trim() || '(vacío)') + ' no válido: solo se permite ' + ORIGENES_VALIDOS);
+      const dest = convertirSuc(destino);
+      if (!dest) errs.push('Falta el destino');
+      else if (sucursalesCodigos && !sucursalesCodigos.has(dest)) errs.push('Destino ' + dest + ' no existe en la tabla de sucursales');
+      if (col && sku) {
+        const reg = maestroMultiplos.get(String(sku).trim());
+        if (!reg) errs.push('SKU ' + sku + ': no existe en el maestro de múltiplos');
+        else {
+          const m = reg[col]; const c = Number(cantidad);
+          if (m && (!Number.isFinite(c) || c <= 0 || c % m !== 0)) errs.push('SKU ' + sku + ': cantidad ' + (cantidad === '' ? '(vacía)' : cantidad) + ' debe ser múltiplo de ' + m);
+        }
+      }
+      return errs.join(' · ');
     }
     function validarMultiplos() {
       const caja = $('errMultiplos'); if (!caja) return [];
-      if (!maestroMultiplos) return [];
+      if (!maestroMultiplos || !sucursalesCodigos) return [];
       const errores = [];
       document.querySelectorAll('#tablaCuerpo .fila-tarea').forEach((tr, i) => {
         tr.classList.remove('fila-error'); tr.title = '';
         if (filaVacia(tr)) return;
-        const msg = errorFila(tr.querySelector('.origen').value, tr.querySelector('.sku').value.trim().toUpperCase(), tr.querySelector('.cantidad').value);
+        const msg = errorFila(tr.querySelector('.origen').value, tr.querySelector('.destino').value, tr.querySelector('.sku').value.trim().toUpperCase(), tr.querySelector('.cantidad').value);
         if (msg) { tr.classList.add('fila-error'); tr.title = msg; errores.push('Fila ' + (i + 1) + ' · ' + msg); }
       });
       if (errores.length) {
         const lista = errores.slice(0, 15).map(e => '<li>' + esc(e) + '</li>').join('');
         const mas = errores.length > 15 ? '<li>… y ' + (errores.length - 15) + ' más</li>' : '';
-        caja.innerHTML = '⚠ ' + errores.length + (errores.length === 1 ? ' fila no cumple' : ' filas no cumplen') + ' la unidad de distribución. Corrígelas para poder enviar.<ul>' + lista + mas + '</ul>';
+        caja.innerHTML = '⚠ ' + errores.length + (errores.length === 1 ? ' fila no cumple' : ' filas no cumplen') + ' las validaciones (origen, destino o múltiplo). Corrígelas para poder enviar.<ul>' + lista + mas + '</ul>';
         caja.style.display = 'block';
       } else { caja.style.display = 'none'; caja.innerHTML = ''; }
       return errores;
@@ -1069,7 +1080,7 @@
     let validarTimer = null;
     function programarValidacion() {
       clearTimeout(validarTimer);
-      validarTimer = setTimeout(() => { asegurarMaestro().then(validarMultiplos).catch(() => {}); }, 200);
+      validarTimer = setTimeout(() => { Promise.all([asegurarMaestro(), asegurarSucursales()]).then(validarMultiplos).catch(() => {}); }, 200);
     }
 
     function filaVacia(tr) { return ['origen', 'destino', 'sku', 'cantidad'].every(c => !tr.querySelector('.' + c).value.trim()); }
@@ -1181,14 +1192,14 @@
         });
       });
       if (!datos.length) { alert('Agrega al menos una fila con datos.'); return; }
-      try { await asegurarMaestro(); }
+      try { await Promise.all([asegurarMaestro(), asegurarSucursales()]); }
       catch (err) {
-        msg.textContent = 'No se pudo cargar el maestro de múltiplos. Recarga la página e inténtalo de nuevo.';
+        msg.textContent = 'No se pudo cargar el maestro de múltiplos o la tabla de sucursales. Recarga la página e inténtalo de nuevo.';
         msg.className = 'p-3 rounded text-sm text-center font-semibold bg-red-100 text-red-700 block'; return;
       }
       const errs = validarMultiplos();
       if (errs.length) {
-        msg.textContent = 'No se puede enviar: ' + errs.length + (errs.length === 1 ? ' fila no cumple' : ' filas no cumplen') + ' el múltiplo de distribución.';
+        msg.textContent = 'No se puede enviar: ' + errs.length + (errs.length === 1 ? ' fila no cumple' : ' filas no cumplen') + ' las validaciones de origen, destino o múltiplo.';
         msg.className = 'p-3 rounded text-sm text-center font-semibold bg-red-100 text-red-700 block';
         const primera = document.querySelector('#tablaCuerpo .fila-error'); if (primera) primera.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
@@ -1326,7 +1337,7 @@
               <input type="text" class="inp-obs fld fld-sm" value="${esc(g.obs)}" placeholder="Observación CEDIS..." ${sinAcciones ? 'disabled' : ''}>
               <div class="act-btns">
                 <button type="button" class="btn-guardar btn-mini btn-navy" data-key="${esc(g.key)}" ${sinAcciones ? 'disabled' : ''}>${SVG_SAVE} Guardar</button>
-                ${puede('copiar') && (g.estado === 'APROBADO' || esCargado(g.estado)) ? `<button type="button" class="btn-copiar btn-mini btn-green" data-key="${esc(g.key)}" title="Copia filas (Origen, Destino, SKU, Cantidad, Tipo material)">${SVG_COPY} Copiar</button>` : ''}
+                ${(puede('copiar') && (g.estado === 'APROBADO' || esCargado(g.estado))) || (puede('aprobar') && g.estado === 'PENDIENTE') ? `<button type="button" class="btn-copiar btn-mini btn-green" data-key="${esc(g.key)}" title="Copia filas (Origen, Destino, SKU, Cantidad, Tipo material)">${SVG_COPY} Copiar</button>` : ''}
               </div>
             </div>
           </td>`;
