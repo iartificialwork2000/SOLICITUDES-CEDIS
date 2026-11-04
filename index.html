@@ -1042,6 +1042,23 @@
       return (reg && reg.producto) || '—';
     }
     const ORIGENES_VALIDOS = '5499 o 15497';
+
+    // ===== Excepción a la validación de múltiplos =====
+    // Solo estas personas pueden registrar cantidades que no respeten la unidad de distribución del SKU.
+    // Se reconocen por correo; como respaldo, por las palabras del nombre en su perfil.
+    // (Origen, destino y existencia del SKU en el maestro se siguen validando para todos.)
+    const EXCEPCION_MULTIPLO_EMAILS = [
+      'yvillarroel@farmaciaschavez.com.bo',
+      'lcoca@farmaciaschavez.com.bo'
+    ];
+    const EXCEPCION_MULTIPLO_NOMBRES = [['yahaira', 'villarroel'], ['luis', 'coca']];
+    function sinAcentos(t) { return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+    function sinRestriccionMultiplo() {
+      const email = sinAcentos(usuarioActual && usuarioActual.email).trim();
+      if (email && EXCEPCION_MULTIPLO_EMAILS.some(e => sinAcentos(e) === email)) return true;
+      const palabras = sinAcentos(perfilActual && perfilActual.nombre).split(/\s+/).filter(Boolean);
+      return EXCEPCION_MULTIPLO_NOMBRES.some(req => req.every(w => palabras.includes(w)));
+    }
     function errorFila(origen, destino, sku, cantidad) {
       const errs = [];
       const col = ORIGEN_COL[normOrigen(origen)];
@@ -1054,7 +1071,7 @@
         if (!reg) errs.push('SKU ' + sku + ': no existe en el maestro de múltiplos');
         else {
           const m = reg[col]; const c = Number(cantidad);
-          if (m && (!Number.isFinite(c) || c <= 0 || c % m !== 0)) errs.push('SKU ' + sku + ': cantidad ' + (cantidad === '' ? '(vacía)' : cantidad) + ' debe ser múltiplo de ' + m);
+          if (m && !sinRestriccionMultiplo() && (!Number.isFinite(c) || c <= 0 || c % m !== 0)) errs.push('SKU ' + sku + ': cantidad ' + (cantidad === '' ? '(vacía)' : cantidad) + ' debe ser múltiplo de ' + m);
         }
       }
       return errs.join(' · ');
