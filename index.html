@@ -286,6 +286,8 @@
     .det-table tr.fila-rech .qty, .det-table tr.fila-rech td:nth-child(n+5) { text-decoration:line-through; }
     .det-table tr.fila-rech td.acc-sku { text-decoration:none; }
     .badge-rech-sku { display:inline-block; font-size:10px; font-weight:800; color:#be123c; background:#ffe0e4; border-radius:999px; padding:2px 8px; text-decoration:none; }
+    .btn-edit-qty { border:0; background:#e6f4fd; color:var(--blue); border-radius:6px; width:22px; height:22px; cursor:pointer; font-size:12px; line-height:1; vertical-align:middle; }
+    .btn-edit-qty:hover { background:var(--cyan); color:#fff; }
     .btn-rech-sku { font-size:11px; font-weight:700; color:#fff; background:var(--red); border:0; border-radius:7px; padding:4px 9px; cursor:pointer; white-space:nowrap; }
     .btn-rech-sku:hover { background:#be1222; } .btn-rech-sku:disabled { opacity:.5; cursor:wait; }
     .sku-chip { display: inline-block; font-family: Consolas, 'Courier New', monospace; font-weight: 700; font-size: 12px; color: var(--blue); background: #e6f4fd; padding: 2px 7px; border-radius: 6px; }
@@ -944,6 +946,14 @@
         const { error } = await sb.from('solicitudes').update(cambios).in('id', ids);
         if (error) throw error;
       },
+      // Cambia la cantidad de una sola fila. Verifica que se haya actualizado (si el servidor lo bloquea, no siempre da error).
+      async actualizarCantidad(id, cantidad) {
+        const { data, error } = await sb.from('solicitudes').update({ cantidad }).eq('id', id).select('id,cantidad');
+        if (error) throw error;
+        if (!data || !data.length || Number(data[0].cantidad) !== Number(cantidad)) {
+          throw new Error('El servidor no aplicó el cambio: tu perfil no tiene permiso para modificar cantidades en la base de datos.');
+        }
+      },
       // Rechaza una sola fila (SKU). Verifica que realmente se haya actualizado (si una política lo bloquea, no da error).
       async rechazarItem(id) {
         const { data, error } = await sb.from('solicitudes').update({ estado: 'RECHAZADO' }).eq('id', id).eq('estado', 'PENDIENTE').select('id');
@@ -1110,6 +1120,23 @@
       if (puede('rechazar') || puede('editar_todo')) return true;
       const email = sinAcentos(usuarioActual && usuarioActual.email).trim();
       return !!email && RECHAZO_SKU_EMAILS.some(e => sinAcentos(e) === email);
+    }
+    // Modificar la CANTIDAD de una fila desde el detalle del Panel CEDIS: administradores + estas personas
+    const EDITAR_CANTIDAD_EMAILS = [
+      'yvillarroel@farmaciaschavez.com.bo',
+      'lcoca@farmaciaschavez.com.bo'
+    ];
+    function puedeEditarCantidad() {
+      if (puede('editar_todo') || rolActual === 'admin') return true;
+      const email = sinAcentos(usuarioActual && usuarioActual.email).trim();
+      return !!email && EDITAR_CANTIDAD_EMAILS.some(e => sinAcentos(e) === email);
+    }
+    // Una fila es editable si no está rechazada/eliminada; una solicitud ya cargada solo la corrige un administrador
+    function filaCantidadEditable(i) {
+      if (!puedeEditarCantidad()) return false;
+      if (i.estado === 'RECHAZADO' || i.estado === 'ELIMINADO') return false;
+      if (esCargado(i.estado) && !(puede('editar_todo') || rolActual === 'admin')) return false;
+      return true;
     }
     function puedeCopiarPendiente() {
       const email = sinAcentos(usuarioActual && usuarioActual.email).trim();
@@ -1354,7 +1381,9 @@
           <td class="pos">${n + 1}</td>
           <td>${esc(i.origen)}</td>
           <td><span class="sku-chip">${esc(i.sku)}</span></td>
-          <td class="c qty">${esc(i.cantidad ?? 0)}</td>
+          <td class="c qty">${enPanelCedis && filaCantidadEditable(i)
+            ? `<span class="qty-val">${esc(i.cantidad ?? 0)}</span> <button type="button" class="btn-edit-qty" data-key="${esc(g.key)}" data-id="${esc(i.id)}" title="Modificar cantidad">✎</button>`
+            : esc(i.cantidad ?? 0)}</td>
           <td>${esc(i.destino)}</td>
           <td>${esc(tipo)}</td>
           <td>${esc(nombreSkuDe(i.sku))}</td>
@@ -1429,6 +1458,67 @@
     }
     function aplicarFiltrosGuardados(tbody) {
       tbody.querySelectorAll('.detail-wrap').forEach(aplicarFiltroDetalle);
+    }
+
+    // ---- Aviso visible al modificar cantidades ----
+    function avisoCantidad(texto, ok) {
+      let cont = $('notifToasts');
+      if (!cont) { cont = document.createElement('div'); cont.id = 'notifToasts'; document.body.appendChild(cont); }
+      const t = document.createElement('div');
+      t.className = 'notif-toast';
+      if (!ok) t.style.background = 'linear-gradient(135deg,#e11d2e,#9f1239)';
+      t.innerHTML = '<span class="t-ico">' + (ok ? '✏️' : '⚠️') + '</span><div class="t-body"><small>' + (ok ? 'Cantidad modificada' : 'No se pudo modificar') + '</small>' + esc(texto) + '</div><button type="button" class="t-x" aria-label="Cerrar">×</button>';
+      const cerrar = () => { t.classList.add('sale'); setTimeout(() => t.remove(), 300); };
+      t.addEventListener('click', cerrar);
+      cont.appendChild(t);
+      setTimeout(() => { if (t.isConnected) cerrar(); }, 9000);
+    }
+
+    function abrirEditorCantidad(btn) {
+      const td = btn.closest('td');
+      const actual = td.querySelector('.qty-val').textContent.trim();
+      td.dataset.original = actual;
+      td.innerHTML = `<input type="number" class="inp-qty" min="1" step="1" value="${esc(actual)}" style="width:84px;padding:3px 6px;border:1px solid #1cbcec;border-radius:6px;text-align:center">
+        <button type="button" class="btn-qty-ok btn-mini btn-green" data-key="${esc(btn.dataset.key)}" data-id="${esc(btn.dataset.id)}" title="Guardar">✓</button>
+        <button type="button" class="btn-qty-cancel btn-mini" style="background:#64748b" data-key="${esc(btn.dataset.key)}" data-id="${esc(btn.dataset.id)}" title="Cancelar">✕</button>`;
+      const inp = td.querySelector('.inp-qty'); inp.focus(); inp.select();
+    }
+    function cerrarEditorCantidad(td, valor, key, id) {
+      td.innerHTML = `<span class="qty-val">${esc(valor)}</span> <button type="button" class="btn-edit-qty" data-key="${esc(key)}" data-id="${esc(id)}" title="Modificar cantidad">✎</button>`;
+    }
+
+    async function guardarCantidad(btn) {
+      const g = gruposCedis.get(btn.dataset.key);
+      if (!g) return;
+      const it = g.items.find(x => String(x.id) === String(btn.dataset.id));
+      const td = btn.closest('td');
+      if (!it || !filaCantidadEditable(it)) { avisoCantidad('Tu perfil no puede modificar esta fila.', false); return; }
+      const nueva = Number(td.querySelector('.inp-qty').value);
+      const anterior = Number(it.cantidad) || 0;
+      if (!Number.isInteger(nueva) || nueva <= 0) { avisoCantidad('La cantidad debe ser un número entero mayor a 0.', false); return; }
+      if (nueva === anterior) { cerrarEditorCantidad(td, anterior, g.key, it.id); return; }
+      // Múltiplo de distribución (la excepción de Yahaira/Luis y los administradores no tienen esta restricción)
+      try {
+        await asegurarMaestro();
+        const col = ORIGEN_COL[normOrigen(it.origen)]; const reg = maestroMultiplos.get(String(it.sku).trim());
+        const m = reg && col ? reg[col] : null;
+        if (m && nueva % m !== 0 && !sinRestriccionMultiplo() && !puede('editar_todo') && rolActual !== 'admin') {
+          avisoCantidad('SKU ' + it.sku + ': la cantidad debe ser múltiplo de ' + m + '.', false); return;
+        }
+      } catch (e) {}
+      const msg = `¿Modificar la cantidad de la solicitud N.º ${g.nro}?\n\nSKU: ${it.sku}\nDestino: ${it.destino}\nCantidad: ${anterior} → ${nueva}` +
+        (esAprobado(it.estado) || esCargado(it.estado) ? `\n\n⚠ La solicitud está ${it.estado}: el cambio afecta una solicitud ya procesada.` : '');
+      if (!confirm(msg)) return;
+      btn.disabled = true;
+      try {
+        await DB.actualizarCantidad(it.id, nueva);
+        avisoCantidad(`Solicitud N.º ${g.nro} · SKU ${it.sku} · destino ${it.destino}: ${anterior} → ${nueva} (por ${(perfilActual && perfilActual.nombre) || usuarioActual.email}).`, true);
+        if (puedeGestionar()) await cargarSolicitudesCedis();
+        await cargarSolicitudesSolicitante();
+      } catch (err) {
+        avisoCantidad(err.message || String(err), false);
+        btn.disabled = false;
+      }
     }
 
     async function rechazarSku(btn) {
@@ -1693,6 +1783,12 @@
     }
 
     function manejarClickTabla(e) {
+      const editQty = e.target.closest('.btn-edit-qty');
+      if (editQty) { abrirEditorCantidad(editQty); return; }
+      const okQty = e.target.closest('.btn-qty-ok');
+      if (okQty) { guardarCantidad(okQty); return; }
+      const cancelQty = e.target.closest('.btn-qty-cancel');
+      if (cancelQty) { const td = cancelQty.closest('td'); cerrarEditorCantidad(td, td.dataset.original, cancelQty.dataset.key, cancelQty.dataset.id); return; }
       const rechSku = e.target.closest('.btn-rech-sku');
       if (rechSku) { rechazarSku(rechSku); return; }
       const limpiar = e.target.closest('.flt-limpiar');
@@ -2374,6 +2470,12 @@
 
       ['tablaSolicitantesBody', 'tablaCedisBody'].forEach(id => {
         $(id).addEventListener('click', manejarClickTabla);
+        $(id).addEventListener('keydown', e => {
+          const inp = e.target.closest && e.target.closest('.inp-qty'); if (!inp) return;
+          const td = inp.closest('td');
+          if (e.key === 'Enter') { e.preventDefault(); td.querySelector('.btn-qty-ok').click(); }
+          if (e.key === 'Escape') { e.preventDefault(); td.querySelector('.btn-qty-cancel').click(); }
+        });
         $(id).addEventListener('input', e => { if (e.target.closest('.flt-det')) aplicarFiltroDetalle(e.target.closest('.detail-wrap')); });
       });
     });
