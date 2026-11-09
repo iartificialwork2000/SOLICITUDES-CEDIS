@@ -2211,7 +2211,7 @@
     // ---- Notificaciones (campana) ----
     // Las notificaciones las crean triggers en Supabase (ver notificaciones.sql).
     let notifItems = [], notifIniciado = false, notifCargadaUnaVez = false;
-    const NOTIF_ICONO = { nueva: '📥', aprobada: '✅', cargada: '📦', rechazada: '❌', eliminada: '🗑️' };
+    const NOTIF_ICONO = { nueva: '📥', aprobada: '✅', cargada: '📦', rechazada: '❌', eliminada: '🗑️', modificada: '✏️' };
 
     function pintarNotificaciones() {
       const noLeidas = notifItems.filter(n => !n.leida).length;
