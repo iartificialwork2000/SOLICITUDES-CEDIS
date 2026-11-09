@@ -222,6 +222,8 @@
     .st-pend i { background: #fff59d; box-shadow: 0 0 8px #fff59d; }
     .st-aprob { background: #3b82f6; border: 1px solid #60a5fa; }
     .st-aprob i { background: #90caf9; box-shadow: 0 0 8px #90caf9; }
+    .st-aprob-obs { background: #0891b2; border: 1px solid #22d3ee; }
+    .st-aprob-obs i { background: #a5f3fc; box-shadow: 0 0 8px #a5f3fc; }
     .st-rech { background: #ef4444; border: 1px solid #f87171; }
     .st-rech i { background: #ffab91; box-shadow: 0 0 8px #ffab91; }
     .st-carg { background: #22c55e; border: 1px solid #4ade80; }
@@ -237,7 +239,10 @@
     .wms-table .grp-head.is-open td { background: #f1f9fe; border-bottom-color: transparent; }
     .wms-table .grp-head td.act-cell { background: #f8fcff; min-width: 185px; max-width: 195px; padding: 8px 6px; }
     .wms-table .grp-head.is-open td.act-cell { background: #f1f9fe; }
-    .nro { font-family: Consolas, 'Courier New', monospace; font-weight: 800; color: var(--blue); font-size: 17px; }
+.nro-wrap { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+    .org-tag { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:800; letter-spacing:.4px; color:#fff; line-height:1.4; }
+    .org-scz { background:#0a7cc2; } .org-lpz { background:#8b3cf0; } .org-otro { background:#64748b; }
+        .nro { font-family: Consolas, 'Courier New', monospace; font-weight: 800; color: var(--blue); font-size: 17px; }
     .carga-por { display: block; margin-top: 3px; font-size: 11px; font-weight: 600; color: #0a7cc2; line-height: 1.2; max-width: 130px; word-break: break-word; }
     .who { font-weight: 700; color: var(--navy); line-height: 1.2; font-size: 13px; }
     .who-sub { font-size: 11.5px; color: #6b8094; margin-top: 1px; }
@@ -263,13 +268,26 @@
     .det-note b { color: var(--navy); }
     .det-note.obs { background: #f7f0ff; color: #5b21a6; }
     .det-note.obs .ico-sm { color: #7c3aed; }
-    .det-card { background: #fff; border-radius: 10px; overflow: hidden; max-width: 760px; margin-top: 4px; box-shadow: 0 0 0 1px #dcedf8, 0 2px 6px -2px rgba(0, 60, 100, .12); }
+    .det-card { background: #fff; border-radius: 10px; overflow-x: auto; max-width: 980px; margin-top: 4px; box-shadow: 0 0 0 1px #dcedf8, 0 2px 6px -2px rgba(0, 60, 100, .12); }
     .wms-table .det-table { width: 100%; border-collapse: collapse; font-size: 13px; }
     .wms-table .det-table thead th { background: var(--navy); color: #e8f6ff; font-size: 10px; font-weight: 700; letter-spacing: .05em; padding: 8px 10px; border: 0; }
     .wms-table .det-table td { padding: 8px 10px; border: 0; border-bottom: 1px solid #edf4fa; color: var(--navy); }
     .wms-table .det-table tbody tr:nth-child(even) td { background: #f8fcff; }
     .det-table .c { text-align: center; }
     .det-table .pos { color: #8aa0b2; font-size: 11.5px; text-align: center; width: 56px; }
+    .det-filtros { display:flex; flex-wrap:wrap; align-items:flex-end; gap:8px; margin:6px 0 8px; max-width:980px; }
+    .det-filtros label { display:flex; flex-direction:column; gap:2px; font-size:10px; font-weight:700; letter-spacing:.04em; color:#5b7285; text-transform:uppercase; }
+    .det-filtros .flt-det { font-size:12.5px; padding:5px 8px; border:1px solid #cfe0ee; border-radius:8px; background:#fff; color:var(--navy); min-width:130px; }
+    .det-filtros .flt-det:focus { outline:2px solid #9bd8f3; border-color:#1cbcec; }
+    .det-filtros .flt-info { font-size:11.5px; color:#5b7285; padding-bottom:6px; }
+    .det-filtros .flt-limpiar { font-size:11.5px; font-weight:700; color:var(--blue); background:none; border:0; cursor:pointer; padding:0 4px 6px; }
+    .det-table tr.fila-rech td { background:#fff1f2 !important; color:#9f1239; }
+    .det-table tr.fila-rech .sku-chip { background:#ffe0e4; color:#be123c; text-decoration:line-through; }
+    .det-table tr.fila-rech .qty, .det-table tr.fila-rech td:nth-child(n+5) { text-decoration:line-through; }
+    .det-table tr.fila-rech td.acc-sku { text-decoration:none; }
+    .badge-rech-sku { display:inline-block; font-size:10px; font-weight:800; color:#be123c; background:#ffe0e4; border-radius:999px; padding:2px 8px; text-decoration:none; }
+    .btn-rech-sku { font-size:11px; font-weight:700; color:#fff; background:var(--red); border:0; border-radius:7px; padding:4px 9px; cursor:pointer; white-space:nowrap; }
+    .btn-rech-sku:hover { background:#be1222; } .btn-rech-sku:disabled { opacity:.5; cursor:wait; }
     .sku-chip { display: inline-block; font-family: Consolas, 'Courier New', monospace; font-weight: 700; font-size: 12px; color: var(--blue); background: #e6f4fd; padding: 2px 7px; border-radius: 6px; }
     .total-pill { display: inline-block; background: var(--navy); color: #fff; padding: 2px 10px; border-radius: 999px; font-variant-numeric: tabular-nums; }
 
@@ -474,7 +492,7 @@
                   <textarea id="comentario" rows="2" placeholder="Aclaraciones para el equipo del CEDIS..." class="fld"></textarea>
                 </div>
                 <div>
-                  <label class="lbl" for="pasteArea">Pegar desde Excel <span class="lbl-sub">Origen | Destino | SKU | Cantidad</span></label>
+                  <label class="lbl" for="pasteArea">Pegar desde Excel <span class="lbl-sub">Origen | SKU | Cantidad | Destino</span></label>
                   <div class="reg-paste">
                     <textarea id="pasteArea" rows="2" placeholder="Pega aquí las filas de Excel..." class="fld mono"></textarea>
                     <button type="button" id="btnCargarFilas" class="btn btn-navy">Cargar filas</button>
@@ -509,7 +527,7 @@
                     <thead>
                       <tr>
                         <th style="width:48px;text-align:center">#</th>
-                        <th>Origen</th><th>Destino</th><th>SKU</th><th>Cantidad</th><th style="width:48px"></th>
+                        <th>Origen</th><th>SKU</th><th>Cantidad</th><th>Destino</th><th style="width:48px"></th>
                       </tr>
                     </thead>
                     <tbody id="tablaCuerpo"></tbody>
@@ -561,6 +579,7 @@
               <option value="TODOS">Todos los estados</option>
               <option value="PENDIENTE" selected>PENDIENTE</option>
               <option value="APROBADO">APROBADO</option>
+              <option value="APROBADO CON OBS">APROBADO CON OBS</option>
               <option value="RECHAZADO">RECHAZADO</option>
               <option value="CARGADO">CARGADO</option>
               <option value="CARGADO CON OBS">CARGADO CON OBS</option>
@@ -593,10 +612,20 @@
           <span class="step">📊</span>
           <h2>Dashboard y Analítica Avanzada</h2>
           <div class="ctl">
+            <select id="dashFiltroCedis" class="fld" style="width:auto" title="Ver el dashboard de un solo CEDIS">
+              <option value="TODOS">General (SCZ + LPZ)</option>
+              <option value="SCZ">Solo CEDIS SCZ (5499)</option>
+              <option value="LPZ">Solo CEDIS LPZ (15497)</option>
+            </select>
             <button type="button" id="btnActualizarDash" class="btn">🔄 Actualizar datos</button>
           </div>
         </div>
         <div class="card-b" style="display:flex; flex-direction:column; gap:14px;">
+          <div class="dash-sec">🏭 Resumen general por CEDIS</div>
+          <div class="inner col" style="overflow-x:auto"><div id="dashResumenCedis"></div></div>
+          <div class="inner col"><h3 style="margin-bottom:8px">Solicitudes por CEDIS y estado</h3><div style="height:240px;"><canvas id="chartCedisEstado"></canvas></div></div>
+
+          <div class="dash-sec" id="dashVista">Vista: general</div>
           <div class="tiles" id="dashTiles"></div>
 
           <div class="dash-sec">⏱️ Tiempos del ciclo y pendientes</div>
@@ -616,7 +645,7 @@
             <div class="inner col"><h3 style="margin-bottom:8px">Filas por mes y promedio por solicitud</h3><div style="height:260px;"><canvas id="chartFilas"></canvas></div></div>
             <div class="inner col"><h3 style="margin-bottom:8px">🧪 Mix por tipo de material (unidades)</h3><div style="height:260px;"><canvas id="chartMaterial"></canvas></div></div>
           </div>
-          <div class="inner col"><h3 style="margin-bottom:8px">🏬 Destinos que más piden (top 10 por unidades)</h3><div id="dashDestinos"></div></div>
+          <div class="inner col"><h3 style="margin-bottom:8px">🏬 Destinos que más piden (top 10) <span style="font-size:11.5px;font-weight:600;color:#64748b">· clic en Solicitudes, Filas o Unidades para ordenar</span></h3><div id="dashDestinos"></div></div>
 
           <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
             <div class="inner col"><h3 style="margin-bottom:8px">📈 Solicitudes por Mes</h3><div style="height:260px;"><canvas id="chartTemporal"></canvas></div></div>
@@ -680,7 +709,7 @@
     let gruposSolicitanteMap = new Map();
     let gruposCedis = new Map();
     const expandidos = new Set();
-    const ESTADOS = ['PENDIENTE', 'APROBADO', 'RECHAZADO', 'CARGADO', 'CARGADO CON OBS', 'ELIMINADO'];
+    const ESTADOS = ['PENDIENTE', 'APROBADO', 'APROBADO CON OBS', 'RECHAZADO', 'CARGADO', 'CARGADO CON OBS', 'ELIMINADO'];
 
     // ---- Permisos ----
     // Los permisos salen de la tabla permisos_rol (Supabase) según el rol del perfil.
@@ -689,6 +718,7 @@
     //           eliminar_propias, eliminar_ajenas, copiar, ver_dashboard, editar_obs, editar_todo
     let permisos = new Set();
     const puede = (accion) => permisos.has(accion);
+    const esAprobado = (e) => e === 'APROBADO' || e === 'APROBADO CON OBS';
     const esCargado = (e) => e === 'CARGADO' || e === 'CARGADO CON OBS';
     const puedeGestionar = () => ['aprobar', 'rechazar', 'cargar', 'cargar_obs', 'editar_todo'].some(puede);
     const esPropia = (g) => !!(usuarioActual && g.user_id && g.user_id === usuarioActual.id);
@@ -701,10 +731,10 @@
         ESTADOS.forEach(e => set.add(e));                      // admin: edita todo
       } else if (!esCargado(g.estado) && g.estado !== 'ELIMINADO') {   // una solicitud cargada queda fija
         if (g.estado === 'PENDIENTE') {
-          if (puede('aprobar')) set.add('APROBADO');
+          if (puede('aprobar')) { set.add('APROBADO'); set.add('APROBADO CON OBS'); }
           if (puede('rechazar')) set.add('RECHAZADO');
           if (puede('eliminar_ajenas') || (puede('eliminar_propias') && esPropia(g))) set.add('ELIMINADO');
-        } else if (g.estado === 'APROBADO') {
+        } else if (esAprobado(g.estado)) {
           if (puede('cargar')) set.add('CARGADO');
           if (puede('cargar_obs')) set.add('CARGADO CON OBS');
           if (puede('eliminar_ajenas')) set.add('ELIMINADO');
@@ -914,6 +944,12 @@
         const { error } = await sb.from('solicitudes').update(cambios).in('id', ids);
         if (error) throw error;
       },
+      // Rechaza una sola fila (SKU). Verifica que realmente se haya actualizado (si una política lo bloquea, no da error).
+      async rechazarItem(id) {
+        const { data, error } = await sb.from('solicitudes').update({ estado: 'RECHAZADO' }).eq('id', id).eq('estado', 'PENDIENTE').select('id');
+        if (error) throw error;
+        if (!data || !data.length) throw new Error('No se pudo rechazar la fila: ya no está pendiente o tu perfil no tiene permiso en el servidor.');
+      },
       // Baja lógica: solo filas propias (user_id) que sigan PENDIENTE.
       // El filtro también protege en el servidor si hay políticas RLS (ver SQL).
       async eliminarPropia(ids, cambios, uid) {
@@ -1059,6 +1095,26 @@
       const palabras = sinAcentos(perfilActual && perfilActual.nombre).split(/\s+/).filter(Boolean);
       return EXCEPCION_MULTIPLO_NOMBRES.some(req => req.every(w => palabras.includes(w)));
     }
+    // ===== Copiar detalle de solicitudes PENDIENTES =====
+    // Además de los permisos del rol, solo estas personas pueden copiar el detalle mientras la solicitud está PENDIENTE.
+    const COPIA_PENDIENTE_EMAILS = [
+      'yvillarroel@farmaciaschavez.com.bo',
+      'lcoca@farmaciaschavez.com.bo'
+    ];
+    // Rechazo por SKU (fila) dentro del detalle: quienes tienen el permiso 'rechazar' + estas personas.
+    const RECHAZO_SKU_EMAILS = [
+      'yvillarroel@farmaciaschavez.com.bo',
+      'lcoca@farmaciaschavez.com.bo'
+    ];
+    function puedeRechazarPorSku() {
+      if (puede('rechazar') || puede('editar_todo')) return true;
+      const email = sinAcentos(usuarioActual && usuarioActual.email).trim();
+      return !!email && RECHAZO_SKU_EMAILS.some(e => sinAcentos(e) === email);
+    }
+    function puedeCopiarPendiente() {
+      const email = sinAcentos(usuarioActual && usuarioActual.email).trim();
+      return !!email && COPIA_PENDIENTE_EMAILS.some(e => sinAcentos(e) === email);
+    }
     function errorFila(origen, destino, sku, cantidad) {
       const errs = [];
       const col = ORIGEN_COL[normOrigen(origen)];
@@ -1139,9 +1195,9 @@
       const tdNum = document.createElement('td'); tdNum.className = 'num p-1 border border-gray-300 text-center text-xs text-gray-500';
       tr.appendChild(tdNum);
       tr.appendChild(crearInput('origen', convertirSuc(or), 'Ej. RECIBO'));
-      tr.appendChild(crearInput('destino', convertirSuc(dest), 'Ej. A-01-02'));
       tr.appendChild(crearInput('sku', sku, 'Ej. SKU-1234'));
       tr.appendChild(crearInput('cantidad', cant, '0', 'number'));
+      tr.appendChild(crearInput('destino', convertirSuc(dest), 'Ej. A-01-02'));
       const tdDel = document.createElement('td'); tdDel.className = 'p-1 border border-gray-300 text-center';
       const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'text-red-500 font-bold px-2'; btn.textContent = '✕';
       btn.addEventListener('click', () => { if (document.querySelectorAll('#tablaCuerpo .fila-tarea').length > 1) { tr.remove(); renumerar(); } });
@@ -1165,12 +1221,12 @@
         if (!linea.trim()) return;
         const columnas = linea.split('\t').map(c => c.trim());
         if (columnas.length >= 4) {
-          agregarFilaTabla(convertirSuc(columnas[0]), convertirSuc(columnas[1]), columnas[2], columnas[3]);
+          agregarFilaTabla(convertirSuc(columnas[0]), convertirSuc(columnas[3]), columnas[1], columnas[2]);
           cargadas++;
         } else {
           const partes = linea.trim().split(/\s+/);
           if (partes.length >= 4) {
-            agregarFilaTabla(convertirSuc(partes[0]), convertirSuc(partes[1]), partes[2], partes[3]);
+            agregarFilaTabla(convertirSuc(partes[0]), convertirSuc(partes[3]), partes[1], partes[2]);
             cargadas++;
           }
         }
@@ -1181,7 +1237,7 @@
         $('pasteInfo').className = 'text-xs text-green-600 font-semibold';
         $('pasteArea').value = '';
       } else {
-        alert('No se pudieron reconocer las columnas. Asegúrate de copiar directamente desde Excel (Origen | Destino | SKU | Cantidad).');
+        alert('No se pudieron reconocer las columnas. Asegúrate de copiar directamente desde Excel (Origen | SKU | Cantidad | Destino).');
         agregarFilaTabla();
       }
     }
@@ -1235,7 +1291,7 @@
     }
 
     function badge(est) {
-      const cls = { 'PENDIENTE': 'st-pend', 'APROBADO': 'st-aprob', 'RECHAZADO': 'st-rech', 'CARGADO': 'st-carg', 'CARGADO CON OBS': 'st-obs', 'ELIMINADO': 'st-elim' };
+      const cls = { 'PENDIENTE': 'st-pend', 'APROBADO': 'st-aprob', 'APROBADO CON OBS': 'st-aprob-obs', 'RECHAZADO': 'st-rech', 'CARGADO': 'st-carg', 'CARGADO CON OBS': 'st-obs', 'ELIMINADO': 'st-elim' };
       return `<span class="st ${cls[est] || 'st-pend'}"><i></i>${esc(est)}</span>`;
     }
     const fechaHTML = (f) => {
@@ -1262,7 +1318,9 @@
         g.solicitante = p.solicitante;
         g.user_id = p.user_id || null;
         g.created_at = p.created_at;
-        g.estado = g.items.map(i => i.estado).sort((x, y) => ESTADOS.indexOf(x) - ESTADOS.indexOf(y))[0] || p.estado;
+        // Las filas rechazadas individualmente (por SKU) no cuentan para el estado global mientras quede alguna otra fila
+        const vivas = g.items.filter(i => i.estado !== 'RECHAZADO');
+        g.estado = (vivas.length ? vivas : g.items).map(i => i.estado).sort((x, y) => ESTADOS.indexOf(x) - ESTADOS.indexOf(y))[0] || p.estado;
         g.comentario = p.comentario;
         g.fecha_aprobacion = (g.items.find(i => i.fecha_aprobacion) || {}).fecha_aprobacion || null;
         g.fecha_carga = (g.items.find(i => i.fecha_carga) || {}).fecha_carga || null;
@@ -1280,51 +1338,131 @@
     const SVG_SAVE = '<svg class="ico-sm" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg>';
     const SVG_TRASH = '<svg class="ico-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
 
-    function detalleHTML(g) {
-      const filas = g.items.map((i, n) => `
-        <tr>
+    const filtrosDetalle = new Map();   // key de solicitud -> { dest, sku, tipo } (se conservan al recargar)
+
+    function detalleHTML(g, enPanelCedis) {
+      // El rechazo por SKU solo existe en el panel CEDIS; en Mis solicitudes el detalle es de solo lectura
+      const conAcc = !!enPanelCedis && puedeRechazarPorSku() && g.items.some(i => i.estado === 'PENDIENTE') && g.items.some(i => i.estado !== 'RECHAZADO');
+      const f = filtrosDetalle.get(g.key) || { dest: '', sku: '', tipo: '' };
+      const tipos = [...new Set(g.items.map(i => tipoMaterialDe(i.sku)))].sort((a, b) => a.localeCompare(b, 'es'));
+      const filas = g.items.map((i, n) => {
+        const rech = i.estado === 'RECHAZADO' && g.items.some(x => x.estado !== 'RECHAZADO');
+        const tipo = tipoMaterialDe(i.sku);
+        const puedeRech = conAcc && i.estado === 'PENDIENTE';
+        return `
+        <tr class="fila-det ${rech ? 'fila-rech' : ''}" data-dest="${esc(String(i.destino || '').toLowerCase())}" data-sku="${esc(String(i.sku || '').toLowerCase())}" data-tipo="${esc(tipo)}" data-qty="${Number(i.cantidad) || 0}" data-rech="${rech ? 1 : 0}">
           <td class="pos">${n + 1}</td>
           <td>${esc(i.origen)}</td>
-          <td>${esc(i.destino)}</td>
           <td><span class="sku-chip">${esc(i.sku)}</span></td>
           <td class="c qty">${esc(i.cantidad ?? 0)}</td>
-          <td>${esc(tipoMaterialDe(i.sku))}</td>
+          <td>${esc(i.destino)}</td>
+          <td>${esc(tipo)}</td>
           <td>${esc(nombreSkuDe(i.sku))}</td>
-        </tr>`).join('');
-      const total = g.items.reduce((s, i) => s + (Number(i.cantidad) || 0), 0);
+          ${conAcc ? `<td class="acc-sku c">${rech ? '<span class="badge-rech-sku">RECHAZADO</span>' : puedeRech ? `<button type="button" class="btn-rech-sku" data-key="${esc(g.key)}" data-id="${esc(i.id)}" title="Rechazar solo este SKU">Rechazar SKU</button>` : ''}</td>` : ''}
+        </tr>`;
+      }).join('');
+      const activas = g.estado === 'RECHAZADO' ? g.items : g.items.filter(i => i.estado !== 'RECHAZADO');
+      const total = activas.reduce((s, i) => s + (Number(i.cantidad) || 0), 0);
+      const nRech = g.items.length - activas.length;
       return `
-        <div class="detail-wrap">
+        <div class="detail-wrap" data-key="${esc(g.key)}">
           <div class="det-top">
             <h4>Detalle de la solicitud</h4>
-            <span class="chip">${g.items.length} ${g.items.length === 1 ? 'fila' : 'filas'}</span>
+            <span class="chip">${g.items.length} ${g.items.length === 1 ? 'fila' : 'filas'}${nRech ? ' · ' + nRech + ' rechazada' + (nRech === 1 ? '' : 's') : ''}</span>
           </div>
           ${g.comentario ? `<div class="det-note">${SVG_MSG}<div><b>Comentario:</b> ${esc(g.comentario)}</div></div>` : ''}
           ${g.obs ? `<div class="det-note obs">${SVG_INFO}<div><b>Obs. CEDIS:</b> ${esc(g.obs)}</div></div>` : ''}
+          <div class="det-filtros">
+            <label>Destino<input type="search" class="flt-det flt-dest" placeholder="Buscar destino..." value="${esc(f.dest)}" autocomplete="off"></label>
+            <label>SKU<input type="search" class="flt-det flt-sku" placeholder="Buscar SKU..." value="${esc(f.sku)}" autocomplete="off"></label>
+            <label>Tipo de material<select class="flt-det flt-tipo"><option value="">Todos</option>${tipos.map(t => `<option value="${esc(t)}" ${f.tipo === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
+            <button type="button" class="flt-limpiar">Limpiar filtros</button>
+            <span class="flt-info"></span>
+          </div>
           <div class="det-card">
             <table class="det-table">
               <thead>
                 <tr>
                   <th class="c" style="width:56px">POSIC.</th>
                   <th>ORIGEN</th>
-                  <th>DESTINO</th>
                   <th>SKU</th>
                   <th class="c">CANTIDAD</th>
+                  <th>DESTINO</th>
                   <th>TIPO MATERIAL</th>
                   <th>NOMBRE SKU</th>
+                  ${conAcc ? '<th class="c">ACCIÓN</th>' : ''}
                 </tr>
               </thead>
               <tbody>${filas}</tbody>
               <tfoot>
                 <tr>
-                  <td colspan="4" style="text-align:right">Total unidades</td>
+                  <td colspan="3" style="text-align:right">Total unidades</td>
                   <td class="c"><span class="total-pill">${total.toLocaleString('es-BO')}</span></td>
                   <td></td>
                   <td></td>
+                  <td></td>
+                  ${conAcc ? '<td></td>' : ''}
                 </tr>
               </tfoot>
             </table>
           </div>
         </div>`;
+    }
+
+    // Filtra las filas del detalle sin volver a pintar la tabla
+    function aplicarFiltroDetalle(wrap) {
+      if (!wrap) return;
+      const dest = wrap.querySelector('.flt-dest').value.trim().toLowerCase();
+      const sku = wrap.querySelector('.flt-sku').value.trim().toLowerCase();
+      const tipo = wrap.querySelector('.flt-tipo').value;
+      filtrosDetalle.set(wrap.dataset.key, { dest: wrap.querySelector('.flt-dest').value, sku: wrap.querySelector('.flt-sku').value, tipo });
+      let vis = 0, uni = 0;
+      const filas = wrap.querySelectorAll('tbody tr.fila-det');
+      filas.forEach(tr => {
+        const ok = (!dest || tr.dataset.dest.includes(dest)) && (!sku || tr.dataset.sku.includes(sku)) && (!tipo || tr.dataset.tipo === tipo);
+        tr.style.display = ok ? '' : 'none';
+        if (ok) { vis++; if (tr.dataset.rech !== '1') uni += Number(tr.dataset.qty) || 0; }
+      });
+      const hay = !!(dest || sku || tipo);
+      wrap.querySelector('.flt-limpiar').style.display = hay ? '' : 'none';
+      wrap.querySelector('.flt-info').textContent = hay ? `Mostrando ${vis} de ${filas.length} filas · ${uni.toLocaleString('es-BO')} unidades` : '';
+    }
+    function aplicarFiltrosGuardados(tbody) {
+      tbody.querySelectorAll('.detail-wrap').forEach(aplicarFiltroDetalle);
+    }
+
+    async function rechazarSku(btn) {
+      const g = gruposCedis.get(btn.dataset.key);
+      if (!g) return;
+      const it = g.items.find(x => String(x.id) === String(btn.dataset.id));
+      if (!it || it.estado !== 'PENDIENTE' || !puedeRechazarPorSku()) return;
+      const pendientes = g.items.filter(x => x.estado === 'PENDIENTE').length;
+      let msg = `¿Rechazar el SKU ${it.sku} (destino ${it.destino}, cantidad ${it.cantidad}) de la solicitud N.º ${g.nro}?`;
+      if (pendientes === 1 && g.items.every(x => x.estado === 'PENDIENTE' || x.estado === 'RECHAZADO')) {
+        msg += '\n\nEs la última fila pendiente: la solicitud completa quedará RECHAZADA.';
+      }
+      if (!confirm(msg)) return;
+      btn.disabled = true;
+      try {
+        await DB.rechazarItem(it.id);
+        if (puedeGestionar()) await cargarSolicitudesCedis();
+        await cargarSolicitudesSolicitante();
+      } catch (err) {
+        alert('Error al rechazar: ' + (err.message || err));
+        btn.disabled = false;
+      }
+    }
+
+    // Iniciales del origen: 5499 = SCZ, 15497 = LPZ (si la solicitud mezcla orígenes, muestra ambas)
+    function origenTagsHTML(g) {
+      const NOM = { '05499': ['SCZ', 'org-scz', 'Santa Cruz (5499)'], '15497': ['LPZ', 'org-lpz', 'La Paz (15497)'] };
+      const vistos = [];
+      (g.items || []).forEach(i => { const o = normOrigen(i.origen); if (!vistos.includes(o)) vistos.push(o); });
+      return vistos.map(o => {
+        const n = NOM[o];
+        return n ? `<span class="org-tag ${n[1]}" title="${n[2]}">${n[0]}</span>`
+                 : `<span class="org-tag org-otro" title="Origen ${esc(o)}">${esc(o) || '?'}</span>`;
+      }).join('');
     }
 
     function esDuenoPendiente(g) {
@@ -1354,7 +1492,7 @@
               <input type="text" class="inp-obs fld fld-sm" value="${esc(g.obs)}" placeholder="Observación CEDIS..." ${sinAcciones ? 'disabled' : ''}>
               <div class="act-btns">
                 <button type="button" class="btn-guardar btn-mini btn-navy" data-key="${esc(g.key)}" ${sinAcciones ? 'disabled' : ''}>${SVG_SAVE} Guardar</button>
-                ${(puede('copiar') && (g.estado === 'APROBADO' || esCargado(g.estado))) || (puede('aprobar') && g.estado === 'PENDIENTE') ? `<button type="button" class="btn-copiar btn-mini btn-green" data-key="${esc(g.key)}" title="Copia filas (Origen, Destino, SKU, Cantidad, Tipo material)">${SVG_COPY} Copiar</button>` : ''}
+                ${(puede('copiar') && (esAprobado(g.estado) || esCargado(g.estado))) || (puede('aprobar') && g.estado === 'PENDIENTE') || (g.estado === 'PENDIENTE' && puedeCopiarPendiente()) ? `<button type="button" class="btn-copiar btn-mini btn-green" data-key="${esc(g.key)}" title="Copia filas (Origen, SKU, Cantidad, Destino, Tipo material)">${SVG_COPY} Copiar</button>` : ''}
               </div>
             </div>
           </td>`;
@@ -1365,6 +1503,7 @@
           accion = `
           <td style="text-align:center">
             ${puedeEliminar ? `<button type="button" class="btn-delete-sol" data-key="${esc(g.key)}">${SVG_TRASH} Eliminar</button>` : `<span style="color:#94a3b8; font-size:11px;">${sinPermiso}</span>`}
+            ${g.estado === 'PENDIENTE' && puedeCopiarPendiente() ? `<div style="margin-top:4px"><button type="button" class="btn-copiar btn-mini btn-green" data-key="${esc(g.key)}" title="Copia filas (Origen, SKU, Cantidad, Destino, Tipo material)">${SVG_COPY} Copiar</button></div>` : ''}
           </td>`;
         }
 
@@ -1375,7 +1514,7 @@
             <td style="text-align:center">
               <button type="button" class="btn-toggle" aria-expanded="${abierto}" aria-label="Ver detalle">${SVG_CHEV}</button>
             </td>
-            <td><span class="nro">${esc(g.nro)}</span></td>
+            <td><div class="nro-wrap"><span class="nro">${esc(g.nro)}</span>${origenTagsHTML(g)}</div></td>
             <td>
               <div class="who">${esc(g.solicitante) || '-'}</div>
               <div class="who-sub">${esc(g.area) || '-'}</div>
@@ -1389,15 +1528,17 @@
             ${accion}
           </tr>
           <tr class="grp-det ${abierto ? 'open' : ''}">
-            <td colspan="${cols}"><div class="det-anim"><div class="det-clip">${detalleHTML(g)}</div></div></td>
+            <td colspan="${cols}"><div class="det-anim"><div class="det-clip">${detalleHTML(g, conAccion)}</div></div></td>
           </tr>`;
       }).join('');
+      aplicarFiltrosGuardados(tbody);
     }
 
     function renderTilesEstados(id, grupos) {
       const c = { PENDIENTE: 0, APROBADO: 0, RECHAZADO: 0, CARGADO: 0 };
       grupos.forEach(g => {
         if (g.estado === 'CARGADO' || g.estado === 'CARGADO CON OBS') c.CARGADO++;
+        else if (g.estado === 'APROBADO CON OBS') c.APROBADO++;
         else if (c[g.estado] !== undefined) c[g.estado]++;
       });
       const items = [['Total', grupos.length, 'c-blue'], ['Pendientes', c.PENDIENTE, 'c-orange'],
@@ -1500,7 +1641,7 @@
 
       let aprob = g.fecha_aprobacion, carga = g.fecha_carga;
       if (estado === 'PENDIENTE' || estado === 'RECHAZADO' || estado === 'ELIMINADO') { aprob = null; carga = null; }
-      else if (estado === 'APROBADO') { aprob = aprob || ahora; carga = null; }
+      else if (esAprobado(estado)) { aprob = aprob || ahora; carga = null; }
       else { aprob = aprob || ahora; carga = carga || ahora; }
 
       const cargado = (estado === 'CARGADO' || estado === 'CARGADO CON OBS')
@@ -1512,7 +1653,9 @@
         // Si la observación no se tocó, se envía tal cual está guardada (sin recortar espacios)
         const obsEnviar = (estado === g.estado && obs === obsOriginal.trim()) ? obsOriginal : obs;
         const cambios = { estado, observaciones_cedis: obsEnviar, fecha_aprobacion: aprob, fecha_carga: carga, cargado_por: cargado };
-        const ids = g.items.map(i => i.id);
+        // Las filas rechazadas por SKU conservan su estado (salvo al rechazar o eliminar toda la solicitud)
+        const hayVivas = g.items.some(i => i.estado !== 'RECHAZADO');
+        const ids = g.items.filter(i => !(hayVivas && estado !== 'RECHAZADO' && estado !== 'ELIMINADO' && i.estado === 'RECHAZADO')).map(i => i.id);
         try {
           await DB.actualizar(ids, cambios);
         } catch (e1) {
@@ -1530,9 +1673,11 @@
     }
 
     async function copiarGrupo(btn) {
-      const g = gruposCedis.get(btn.dataset.key);
+      const g = gruposCedis.get(btn.dataset.key) || gruposSolicitanteMap.get(btn.dataset.key);
       if (!g) return;
-      const texto = g.items.map(i => [i.origen, i.destino, i.sku, i.cantidad, tipoMaterialDe(i.sku)].join('\t')).join('\r\n');
+      if (g.estado === 'PENDIENTE' && !puede('aprobar') && !puedeCopiarPendiente()) return;
+      const aCopiar = g.items.filter(i => i.estado !== 'RECHAZADO');
+      const texto = (aCopiar.length ? aCopiar : g.items).map(i => [i.origen, i.sku, i.cantidad, i.destino, tipoMaterialDe(i.sku)].join('\t')).join('\r\n');
       let ok = false;
       try { await navigator.clipboard.writeText(texto); ok = true; } catch (e) {}
       if (!ok) {
@@ -1548,6 +1693,14 @@
     }
 
     function manejarClickTabla(e) {
+      const rechSku = e.target.closest('.btn-rech-sku');
+      if (rechSku) { rechazarSku(rechSku); return; }
+      const limpiar = e.target.closest('.flt-limpiar');
+      if (limpiar) {
+        const w = limpiar.closest('.detail-wrap');
+        w.querySelector('.flt-dest').value = ''; w.querySelector('.flt-sku').value = ''; w.querySelector('.flt-tipo').value = '';
+        aplicarFiltroDetalle(w); return;
+      }
       const delSol = e.target.closest('.btn-delete-sol');
       if (delSol) { eliminarSolicitudSolicitante(delSol); return; }
       const copiar = e.target.closest('.btn-copiar');
@@ -1567,7 +1720,7 @@
 
     // ---- Dashboard: los datos salen de la tabla solicitudes de Supabase (las eliminadas no cuentan) ----
     const dashCharts = {};
-    const ESTADO_COLOR = { 'PENDIENTE': '#f59e0b', 'APROBADO': '#1cbcec', 'RECHAZADO': '#e11d2e', 'CARGADO': '#16a34a', 'CARGADO CON OBS': '#8b5cf6' };
+    const ESTADO_COLOR = { 'PENDIENTE': '#f59e0b', 'APROBADO': '#1cbcec', 'APROBADO CON OBS': '#0891b2', 'RECHAZADO': '#e11d2e', 'CARGADO': '#16a34a', 'CARGADO CON OBS': '#8b5cf6' };
     const PALETA_AREAS = ['#1cbcec', '#0b3a5b', '#16a34a', '#f59e0b', '#8b5cf6', '#e11d2e', '#14b8a6', '#ec4899', '#64748b'];
 
     function dashGrafico(id, cfg) {
@@ -1591,6 +1744,68 @@
           '</div></div>').join('') + '</div>';
     }
 
+    // ---- Resumen comparativo por CEDIS (siempre con todos los datos, sin importar el filtro) ----
+    function cedisDeOrigen(o) { const n = normOrigen(o); return n === '05499' ? 'SCZ' : n === '15497' ? 'LPZ' : 'OTRO'; }
+    function dashResumenCedis(datos) {
+      const vivos = datos.filter(i => i.estado !== 'ELIMINADO');
+      const ahora = Date.now();
+      const hrs = (a, b) => { const h = (new Date(b) - new Date(a)) / 36e5; return Number.isFinite(h) && h >= 0 ? h : null; };
+      const fmtH = (h) => h == null ? '—' : h < 1 ? Math.round(h * 60) + ' min' : h < 48 ? h.toFixed(1) + ' h' : (h / 24).toFixed(1) + ' días';
+      const fmtPct = (x) => x.toLocaleString('es-BO', { maximumFractionDigits: 1 }) + '%';
+      const calc = (its) => {
+        const gs = agrupar(its).filter(g => g.estado !== 'ELIMINADO');
+        const n = (...e) => gs.filter(g => e.includes(g.estado)).length;
+        const pend = n('PENDIENTE'), aprob = n('APROBADO', 'APROBADO CON OBS'), carg = n('CARGADO', 'CARGADO CON OBS'), rech = n('RECHAZADO');
+        const resueltas = aprob + carg + rech;
+        const ciclos = gs.filter(g => g.fecha_carga).map(g => hrs(g.created_at, g.fecha_carga)).filter(h => h != null);
+        const abiertas24 = gs.filter(g => g.estado === 'PENDIENTE' || g.estado === 'APROBADO' || g.estado === 'APROBADO CON OBS')
+          .filter(g => { const h = hrs(g.estado === 'PENDIENTE' ? g.created_at : (g.fecha_aprobacion || g.created_at), ahora); return h != null && h > 24; }).length;
+        return {
+          sol: gs.length, pend, aprob, carg, rech,
+          unid: its.reduce((t, i) => t + (Number(i.cantidad) || 0), 0),
+          fill: resueltas ? (aprob + carg) / resueltas * 100 : null,
+          rechazo: gs.length ? rech / gs.length * 100 : null,
+          ciclo: ciclos.length ? ciclos.reduce((t, x) => t + x, 0) / ciclos.length : null,
+          ab24: abiertas24,
+          cargObs: n('CARGADO CON OBS'), aprobObs: n('APROBADO CON OBS'),
+          porEstado: Object.fromEntries(ESTADOS.map(e => [e, gs.filter(g => g.estado === e).length]))
+        };
+      };
+      const cols = [['SCZ', 'org-scz'], ['LPZ', 'org-lpz']];
+      if (vivos.some(i => cedisDeOrigen(i.origen) === 'OTRO')) cols.push(['OTRO', 'org-otro']);
+      const res = {};
+      cols.forEach(([k]) => { res[k] = calc(vivos.filter(i => cedisDeOrigen(i.origen) === k)); });
+      res.TOTAL = calc(vivos);
+      const filas = [
+        ['Solicitudes', r => r.sol.toLocaleString('es-BO')],
+        ['Pendientes', r => r.pend],
+        ['Aprobadas (sin cargar)', r => r.aprob + (r.aprobObs ? ' <span style="color:#64748b;font-size:11px">(' + r.aprobObs + ' con obs.)</span>' : '')],
+        ['Cargadas', r => r.carg + (r.cargObs ? ' <span style="color:#64748b;font-size:11px">(' + r.cargObs + ' con obs.)</span>' : '')],
+        ['Rechazadas', r => r.rech],
+        ['Unidades', r => r.unid.toLocaleString('es-BO')],
+        ['Fill rate', r => r.fill == null ? '—' : fmtPct(r.fill)],
+        ['Tasa de rechazo', r => r.rechazo == null ? '—' : fmtPct(r.rechazo)],
+        ['Ciclo total (promedio)', r => fmtH(r.ciclo)],
+        ['Abiertas > 24 h', r => r.ab24]
+      ];
+      $('dashResumenCedis').innerHTML =
+        '<table class="dash-tabla"><thead><tr><th>Indicador</th>' +
+        cols.map(([k, c]) => '<th><span class="org-tag ' + c + '">' + k + '</span></th>').join('') +
+        '<th>General</th></tr></thead><tbody>' +
+        filas.map(([l, f]) => '<tr><td><b>' + l + '</b></td>' + cols.map(([k]) => '<td>' + f(res[k]) + '</td>').join('') + '<td><b>' + f(res.TOTAL) + '</b></td></tr>').join('') +
+        '</tbody></table>' +
+        '<div style="font-size:11.5px;color:#64748b;margin-top:6px">Una solicitud con filas de SCZ y de LPZ se cuenta en ambos CEDIS; la columna General la cuenta una sola vez.</div>';
+      const estadosGraf = ESTADOS.filter(e => e !== 'ELIMINADO');
+      dashGrafico('chartCedisEstado', {
+        type: 'bar',
+        data: {
+          labels: cols.map(([k]) => k),
+          datasets: estadosGraf.map(e => ({ label: e, backgroundColor: ESTADO_COLOR[e], data: cols.map(([k]) => res[k].porEstado[e]) }))
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } } }
+      });
+    }
+
     async function cargarDashboard() {
       if (!puede('ver_dashboard')) return;
       const tiles = $('dashTiles');
@@ -1607,6 +1822,12 @@
         tiles.innerHTML = '<div class="notif-vacio" style="grid-column:1/-1">No se pudieron cargar los datos del dashboard. Pulsa “Actualizar datos” o recarga la página.</div>';
         return;
       }
+      try { dashResumenCedis(datos); } catch (e) { console.error('Dashboard (resumen CEDIS)', e); }
+      const filtroCedis = $('dashFiltroCedis').value;
+      if (filtroCedis !== 'TODOS') datos = datos.filter(i => cedisDeOrigen(i.origen) === filtroCedis);
+      $('dashVista').textContent = filtroCedis === 'TODOS'
+        ? 'Vista: general (SCZ + LPZ)'
+        : 'Vista: solo CEDIS ' + filtroCedis + ' (si una solicitud mezcla orígenes, aquí solo cuentan sus filas de ' + filtroCedis + ')';
       const todos = agrupar(datos);
       const grupos = todos.filter(g => g.estado !== 'ELIMINADO');
       const items = datos.filter(i => i.estado !== 'ELIMINADO');
@@ -1617,7 +1838,7 @@
       tiles.innerHTML =
         tile('Solicitudes', grupos.length.toLocaleString('es-BO'), 'c-blue') +
         tile('Pendientes', cuenta('PENDIENTE').toLocaleString('es-BO'), 'c-orange') +
-        tile('Aprobadas', cuenta('APROBADO').toLocaleString('es-BO'), 'c-purple') +
+        tile('Aprobadas', cuenta('APROBADO', 'APROBADO CON OBS').toLocaleString('es-BO'), 'c-purple') +
         tile('Cargadas', cuenta('CARGADO', 'CARGADO CON OBS').toLocaleString('es-BO'), 'c-green') +
         tile('Rechazadas', cuenta('RECHAZADO').toLocaleString('es-BO'), 'c-red') +
         tile('Unidades', unidades.toLocaleString('es-BO'), 'c-blue');
@@ -1724,10 +1945,10 @@
 
       // ===== 2) Pendientes envejecidas =====
       const abiertas = grupos
-        .filter(g => g.estado === 'PENDIENTE' || g.estado === 'APROBADO')
+        .filter(g => g.estado === 'PENDIENTE' || esAprobado(g.estado))
         .map(g => {
-          const desde = g.estado === 'APROBADO' ? (g.fecha_aprobacion || g.created_at) : g.created_at;
-          return { g, etapa: g.estado === 'APROBADO' ? 'Sin cargar' : 'Sin aprobar', h: horas(desde, ahora) };
+          const desde = esAprobado(g.estado) ? (g.fecha_aprobacion || g.created_at) : g.created_at;
+          return { g, etapa: esAprobado(g.estado) ? 'Sin cargar' : 'Sin aprobar', h: horas(desde, ahora) };
         })
         .filter(x => x.h != null)
         .sort((a, b) => b.h - a.h);
@@ -1746,7 +1967,7 @@
       const nCarg = grupos.filter(g => g.estado === 'CARGADO' || g.estado === 'CARGADO CON OBS').length;
       const nObs = grupos.filter(g => g.estado === 'CARGADO CON OBS').length;
       // Fill rate = solicitudes aprobadas (aprobadas + cargadas) sobre las ya resueltas (aprobadas + rechazadas). Las pendientes aún no cuentan.
-      const esAprobada = (g) => g.estado === 'APROBADO' || g.estado === 'CARGADO' || g.estado === 'CARGADO CON OBS';
+      const esAprobada = (g) => esAprobado(g.estado) || g.estado === 'CARGADO' || g.estado === 'CARGADO CON OBS';
       const esResuelta = (g) => esAprobada(g) || g.estado === 'RECHAZADO';
       const nApr = grupos.filter(esAprobada).length, nRes = grupos.filter(esResuelta).length, nPend = grupos.filter(g => g.estado === 'PENDIENTE').length;
       const fr = pct(nApr, nRes);
@@ -1782,7 +2003,7 @@
           scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' } } } }
       });
 
-      const motivos = grupos.filter(g => (g.estado === 'RECHAZADO' || g.estado === 'CARGADO CON OBS')).slice(0, 6);   // ya vienen de más reciente a más antigua
+      const motivos = grupos.filter(g => (g.estado === 'RECHAZADO' || g.estado === 'CARGADO CON OBS' || g.estado === 'APROBADO CON OBS')).slice(0, 6);   // ya vienen de más reciente a más antigua
       $('dashMotivos').innerHTML = motivos.length
         ? '<table class="dash-tabla"><thead><tr><th>N.º</th><th>Estado</th><th>Observación de CEDIS</th></tr></thead><tbody>' +
           motivos.map(g => '<tr><td><b>' + esc(g.nro) + '</b><br><span style="color:#64748b;font-size:11.5px">' + esc(g.area || '') + '</span></td>' +
@@ -1842,23 +2063,33 @@
         r.u += Number(i.cantidad) || 0; r.f++; r.n.add(i.nro_solicitud != null ? i.nro_solicitud : i.solicitud_id);
         porDestino.set(k, r);
       });
-      const topDest = [...porDestino.entries()].sort((a, b) => b[1].u - a[1].u).slice(0, 10);
-      const maxU = Math.max(...topDest.map(([, r]) => r.u), 1);
       const avisoSuc = sucursalesError
         ? '<div class="det-note obs" style="margin-bottom:8px"><div><b>No se pudo leer la tabla “sucursales” de Supabase:</b> ' + esc(sucursalesError) + '. Revisa que la tabla exista y tenga permiso de lectura.</div></div>'
         : (sucursalesMapa && sucursalesMapa.size === 0
           ? '<div class="det-note obs" style="margin-bottom:8px"><div>La tabla “sucursales” está vacía: importa el CSV con los nombres en Supabase.</div></div>' : '');
-      $('dashDestinos').innerHTML = avisoSuc + (topDest.length
-        ? '<div class="dest-head"><span></span><span>Sucursal destino</span><span>Solicitudes</span><span>Filas</span><span>Unidades</span></div>' +
-          topDest.map(([dest, r], n) => {
-            const nom = nombreDestino(dest);
+      dashDestData = [...porDestino.entries()].map(([dest, r]) => ({ dest, sol: r.n.size, filas: r.f, u: r.u }));
+      dashDestAviso = avisoSuc;
+      renderDestinos();
+    }
+
+    // Destinos que más piden: se puede ordenar de mayor a menor por solicitudes, filas o unidades (clic en el encabezado)
+    let dashDestData = [], dashDestAviso = '', dashDestOrden = 'u';
+    function renderDestinos() {
+      const campo = dashDestOrden;
+      const top = [...dashDestData].sort((a, b) => b[campo] - a[campo] || b.u - a.u).slice(0, 10);
+      const max = Math.max(...top.map(r => r[campo]), 1);
+      const th = (c, txt) => '<span class="dest-ord' + (campo === c ? ' act' : '') + '" data-orden="' + c + '" role="button" tabindex="0" title="Ordenar de mayor a menor por ' + txt.toLowerCase() + '" style="cursor:pointer;user-select:none' + (campo === c ? ';color:#0b3a5b;font-weight:900' : '') + '">' + txt + (campo === c ? ' ▼' : '') + '</span>';
+      $('dashDestinos').innerHTML = dashDestAviso + (top.length
+        ? '<div class="dest-head"><span></span><span>Sucursal destino</span>' + th('sol', 'Solicitudes') + th('filas', 'Filas') + th('u', 'Unidades') + '</div>' +
+          top.map((r, n) => {
+            const nom = nombreDestino(r.dest);
             return '<div class="dest-row"><span class="dest-pos">' + (n + 1) + '</span>' +
               '<div style="min-width:0"><div class="dest-nom' + (nom ? '' : ' sin') + '" title="' + esc(nom) + '">' + esc(nom || 'Sin nombre registrado') + '</div>' +
-              '<div class="dest-cod">Cód. <span class="sku-chip">' + esc(dest) + '</span></div>' +
-              '<div class="dest-bar"><i style="width:' + Math.max(3, Math.round(r.u / maxU * 100)) + '%"></i></div></div>' +
-              '<span class="dest-n">' + r.n.size.toLocaleString('es-BO') + '</span>' +
-              '<span class="dest-n">' + r.f.toLocaleString('es-BO') + '</span>' +
-              '<span class="dest-n u">' + r.u.toLocaleString('es-BO') + '</span></div>';
+              '<div class="dest-cod">Cód. <span class="sku-chip">' + esc(r.dest) + '</span></div>' +
+              '<div class="dest-bar"><i style="width:' + Math.max(3, Math.round(r[campo] / max * 100)) + '%"></i></div></div>' +
+              '<span class="dest-n' + (campo === 'sol' ? ' u' : '') + '">' + r.sol.toLocaleString('es-BO') + '</span>' +
+              '<span class="dest-n' + (campo === 'filas' ? ' u' : '') + '">' + r.filas.toLocaleString('es-BO') + '</span>' +
+              '<span class="dest-n' + (campo === 'u' ? ' u' : '') + '">' + r.u.toLocaleString('es-BO') + '</span></div>';
           }).join('')
         : '<div class="notif-vacio">Aún no hay destinos.</div>');
     }
@@ -2103,7 +2334,15 @@
       verificarSesion().then(() => { if (usuarioActual && !puede('crear')) cambiarTab(tabInicial()); });
       $('btnBell').addEventListener('click', (e) => { e.stopPropagation(); abrirNotificaciones(); });
       $('btnNotifTodas').addEventListener('click', marcarTodasLeidas);
-      $('btnActualizarDash').addEventListener('click', cargarDashboard);
+      $('btnActualizarDash').addEventListener('click', () => cargarDashboard());
+      $('dashFiltroCedis').addEventListener('change', () => cargarDashboard());
+      const alOrdenarDestinos = (e) => {
+        const t = e.target.closest('[data-orden]'); if (!t) return;
+        if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault(); dashDestOrden = t.dataset.orden; renderDestinos();
+      };
+      $('dashDestinos').addEventListener('click', alOrdenarDestinos);
+      $('dashDestinos').addEventListener('keydown', alOrdenarDestinos);
       $('notifPanel').addEventListener('click', (e) => {
         e.stopPropagation();
         const item = e.target.closest('.notif-item');
@@ -2133,8 +2372,10 @@
       $('filtroEstadoCedis').addEventListener('change', cargarSolicitudesCedis);
       $('btnActualizarSol').addEventListener('click', cargarSolicitudesSolicitante);
 
-      ['tablaSolicitantesBody', 'tablaCedisBody'].forEach(id =>
-        $(id).addEventListener('click', manejarClickTabla));
+      ['tablaSolicitantesBody', 'tablaCedisBody'].forEach(id => {
+        $(id).addEventListener('click', manejarClickTabla);
+        $(id).addEventListener('input', e => { if (e.target.closest('.flt-det')) aplicarFiltroDetalle(e.target.closest('.detail-wrap')); });
+      });
     });
   })();
   </script>
