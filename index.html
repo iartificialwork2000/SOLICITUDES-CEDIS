@@ -346,6 +346,16 @@
   <meta name="theme-color" content="#1cbcec">
   <link rel="icon" type="image/png" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
+  <style>
+    /* Transición lenta y fluida al cambiar de menú */
+    @keyframes tabEntrar { from { opacity: 0; transform: translate3d(0, 12px, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
+    html { overflow-y: scroll; scrollbar-gutter: stable; }   /* evita el corrimiento lateral cuando aparece la barra de scroll */
+    .tab-content { overflow-x: clip; }
+    .tab-content.tab-wait { opacity: 0; pointer-events: none; }
+    .tab-content.tab-enter { animation: tabEntrar .7s cubic-bezier(.22,.61,.36,1) both; will-change: opacity, transform; }
+    .tab-btn { transition: background-color .4s ease, color .4s ease, box-shadow .4s ease, border-color .4s ease; }
+    @media (prefers-reduced-motion: reduce) { .tab-content.tab-enter { animation: none; } .tab-btn { transition: none; } }
+  </style>
 </head>
 <body>
 
@@ -1021,14 +1031,32 @@
       cambiarTab(tab);
     }
 
+    let animarProx = false;   // true = la próxima carga de tabla entra con animación (solo al cambiar de menú)
+    function animarFilas(tbody) { return;
+      const heads = [...tbody.querySelectorAll('tr.grp-head')];
+      heads.forEach((tr, i) => { tr.classList.remove('fila-enter'); void tr.offsetWidth; tr.style.animationDelay = Math.min(i, 14) * 70 + 'ms'; tr.classList.add('fila-enter'); });
+      setTimeout(() => heads.forEach(tr => { tr.classList.remove('fila-enter'); tr.style.animationDelay = ''; }), 1800);
+    }
+    function revelarSeccion(sec) {
+      sec.classList.remove('tab-wait', 'tab-enter');
+      void sec.offsetWidth;
+      sec.classList.add('tab-enter');
+    }
     function cambiarTab(tab) {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
       const sec = $('sec-' + tab);
-      if (sec) sec.classList.remove('hidden');
-      if (tab === 'solicitantes') cargarSolicitudesSolicitante();
-      if (tab === 'cedis') cargarSolicitudesCedis();
-      if (tab === 'dashboard') cargarDashboard();
+      const carga = tab === 'solicitantes' ? cargarSolicitudesSolicitante
+                  : tab === 'cedis' ? cargarSolicitudesCedis
+                  : tab === 'dashboard' ? cargarDashboard : null;
+      if (!sec) return;
+      sec.classList.remove('hidden', 'tab-enter');
+      if (!carga) { revelarSeccion(sec); return; }
+      // Se carga y pinta todo con la sección aún invisible; luego entra UNA sola vez (sin saltos de ancho ni de filas)
+      sec.classList.add('tab-wait');
+      const espera = new Promise(r => setTimeout(r, 2500));
+      Promise.race([Promise.resolve().then(carga).catch(() => {}), espera])
+        .then(() => requestAnimationFrame(() => { if (!sec.classList.contains('hidden')) revelarSeccion(sec); }));
     }
 
 
@@ -1659,7 +1687,8 @@
 
     async function cargarSolicitudesSolicitante() {
       const tbody = $('tablaSolicitantesBody');
-      tbody.innerHTML = '<tr><td colspan="9" class="text-center p-4">Cargando solicitudes...</td></tr>';
+      const anim = animarProx; animarProx = false;
+      if (!tbody.querySelector('tr.grp-head')) tbody.innerHTML = '<tr><td colspan="9" class="text-center p-4 txt-carga">Cargando solicitudes...</td></tr>';
       try {
         const todos = agrupar(await DB.listar('TODOS'));
         renderTilesEstados('tilesSol', todos);
@@ -1672,6 +1701,7 @@
         }
         renderGrupos(grupos, tbody, false);
         resaltarSolicitudFiltrada(tbody);
+        if (anim) animarFilas(tbody);
       } catch (e) { tbody.innerHTML = '<tr><td colspan="9" class="text-center text-red-500">Error al cargar.</td></tr>'; }
     }
 
@@ -1702,7 +1732,8 @@
       if (!puedeGestionar()) return;
       const tbody = $('tablaCedisBody');
       const filtroEstado = filtroNroNotif != null ? 'TODOS' : $('filtroEstadoCedis').value;
-      tbody.innerHTML = '<tr><td colspan="10" class="text-center p-4">Cargando datos CEDIS...</td></tr>';
+      const anim = animarProx; animarProx = false;
+      if (!tbody.querySelector('tr.grp-head')) tbody.innerHTML = '<tr><td colspan="10" class="text-center p-4 txt-carga">Cargando datos CEDIS...</td></tr>';
       try {
         let grupos = agrupar(await DB.listar('TODOS'));
         renderTilesEstados('tilesCedis', grupos);
@@ -1716,6 +1747,7 @@
         }
         renderGrupos(grupos, tbody, true);
         resaltarSolicitudFiltrada(tbody);
+        if (anim) animarFilas(tbody);
       } catch (err) {
         tbody.innerHTML = '<tr><td colspan="10" class="text-center text-red-500">Error al cargar CEDIS: ' + esc(err.message || err) + '</td></tr>';
       }
@@ -1854,19 +1886,43 @@
           cfg.options.plugins.datalabels = {
             formatter: fmt,
             display: (ctx) => { const v = Number(ctx.dataset.data[ctx.dataIndex]); return Number.isFinite(v) && v !== 0; },
-            font: { weight: '700', size: 11 },
+            font: { weight: '700', size: 13 },
             clamp: true,
-            ...(cfg.type === 'doughnut' || apilado
+            ...(cfg.type === 'doughnut'
+              ? (() => {
+                  // porciones chicas (<7%): etiqueta afuera, escalonada para que no se monten
+                  const chica = (ctx) => { const d = ctx.dataset.data.map(Number); const t = d.reduce((a, b) => a + b, 0) || 1; return d[ctx.dataIndex] / t < 0.07; };
+                  return {
+                    color: (ctx) => chica(ctx) ? '#0b3a5b' : '#fff',
+                    textStrokeColor: (ctx) => chica(ctx) ? 'rgba(255,255,255,0)' : 'rgba(0,0,0,.35)',
+                    textStrokeWidth: (ctx) => chica(ctx) ? 0 : 2,
+                    anchor: (ctx) => chica(ctx) ? 'end' : 'center',
+                    align: (ctx) => chica(ctx) ? 'end' : 'center',
+                    offset: (ctx) => chica(ctx) ? 6 + (ctx.dataIndex % 2) * 18 : 0,
+                    clamp: false
+                  };
+                })()
+              : apilado
               ? { color: '#fff', textStrokeColor: 'rgba(0,0,0,.35)', textStrokeWidth: 2 }
               : cfg.type === 'line'
                 ? { color: '#0b3a5b', anchor: 'end', align: 'top', offset: 4 }
                 : { color: '#0b3a5b', anchor: 'end', align: 'end', offset: 0 })
           };
         }
+        if (cfg.type === 'doughnut') {
+          cfg.options.layout = cfg.options.layout || {};
+          if (cfg.options.layout.padding == null) cfg.options.layout.padding = 30;   // lugar para las etiquetas de afuera
+        }
         if (cfg.type === 'bar' || cfg.type === 'line') {
           const sc = cfg.options.scales = cfg.options.scales || {};
           sc.y = sc.y || {};
-          if (sc.y.grace == null) sc.y.grace = '12%';   // espacio para la etiqueta sobre la barra más alta
+          if (sc.y.max === 100) {
+            // porcentajes: dejamos aire sobre el 100 % para que la etiqueta no se corte
+            sc.y.max = 115;
+            sc.y.ticks = { ...(sc.y.ticks || {}), stepSize: 20, callback: v => v > 100 ? '' : v + '%' };
+          } else if (sc.y.grace == null) sc.y.grace = '15%';   // espacio para la etiqueta sobre la barra más alta
+          cfg.options.layout = cfg.options.layout || {};
+          if (cfg.options.layout.padding == null) cfg.options.layout.padding = { top: 18 };
         }
       }
       dashCharts[id] = new Chart(cv, cfg);
@@ -2177,8 +2233,8 @@
         data: {
           labels: mesesF.map(etiquetaMes),
           datasets: [
-            { type: 'bar', label: 'Filas del mes', data: mesesF.map(k => filasPorMes.get(k).filas), backgroundColor: '#1cbcec', borderRadius: 6, yAxisID: 'y' },
-            { type: 'line', label: 'Filas por solicitud (prom.)', data: mesesF.map(k => +(filasPorMes.get(k).filas / filasPorMes.get(k).sol).toFixed(1)), borderColor: '#0b3a5b', backgroundColor: '#0b3a5b', tension: .3, yAxisID: 'y1' }
+            { type: 'bar', label: 'Filas del mes', data: mesesF.map(k => filasPorMes.get(k).filas), backgroundColor: '#1cbcec', borderRadius: 6, yAxisID: 'y', datalabels: { anchor: 'end', align: 'start', offset: 6, color: '#fff', textStrokeColor: 'rgba(0,0,0,.35)', textStrokeWidth: 2 } },
+            { type: 'line', label: 'Filas por solicitud (prom.)', data: mesesF.map(k => +(filasPorMes.get(k).filas / filasPorMes.get(k).sol).toFixed(1)), borderColor: '#0b3a5b', backgroundColor: '#0b3a5b', tension: .3, yAxisID: 'y1', datalabels: { anchor: 'end', align: 'top', offset: 8, color: '#0b3a5b', backgroundColor: '#fff', borderColor: '#0b3a5b', borderWidth: 1, borderRadius: 4, padding: { top: 2, bottom: 2, left: 5, right: 5 } } }
           ]
         },
         options: { ...opcionesBase, plugins: { legend: { position: 'bottom' } }, scales: {
