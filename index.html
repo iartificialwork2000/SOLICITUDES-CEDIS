@@ -8,6 +8,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
   <style>
     :root {
       --navy: #0b1d2e; --navy-2: #13304b;
@@ -1394,7 +1395,7 @@
         const tipo = tipoMaterialDe(i.sku);
         const puedeRech = conAcc && i.estado === 'PENDIENTE';
         return `
-        <tr class="fila-det ${rech ? 'fila-rech' : ''} ${cantidadAntes(i) != null ? 'fila-mod' : ''}" data-dest="${esc(String(i.destino || '').toLowerCase())}" data-sku="${esc(String(i.sku || '').toLowerCase())}" data-tipo="${esc(tipo)}" data-qty="${Number(i.cantidad) || 0}" data-rech="${rech ? 1 : 0}">
+        <tr class="fila-det ${rech ? 'fila-rech' : ''} ${cantidadAntes(i) != null ? 'fila-mod' : ''}" data-dest="${esc(String(i.destino || '').toLowerCase())}" data-sku="${esc(String(i.sku || '').toLowerCase())}" data-desc="${esc(sinAcentos(nombreSkuDe(i.sku) === '—' ? '' : nombreSkuDe(i.sku)))}" data-tipo="${esc(tipo)}" data-qty="${Number(i.cantidad) || 0}" data-rech="${rech ? 1 : 0}">
           <td class="pos">${n + 1}</td>
           <td>${esc(i.origen)}</td>
           <td><span class="sku-chip">${esc(i.sku)}</span></td>
@@ -1420,7 +1421,7 @@
           ${g.obs ? `<div class="det-note obs">${SVG_INFO}<div><b>Obs. CEDIS:</b> ${esc(g.obs)}</div></div>` : ''}
           <div class="det-filtros">
             <label>Destino<input type="search" class="flt-det flt-dest" placeholder="Buscar destino..." value="${esc(f.dest)}" autocomplete="off"></label>
-            <label>SKU<input type="search" class="flt-det flt-sku" placeholder="Buscar SKU..." value="${esc(f.sku)}" autocomplete="off"></label>
+            <label>SKU<input type="search" class="flt-det flt-sku" placeholder="Buscar SKU o descripción..." value="${esc(f.sku)}" autocomplete="off"></label>
             <label>Tipo de material<select class="flt-det flt-tipo"><option value="">Todos</option>${tipos.map(t => `<option value="${esc(t)}" ${f.tipo === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
             <button type="button" class="flt-limpiar">Limpiar filtros</button>
             <span class="flt-info"></span>
@@ -1460,12 +1461,13 @@
       if (!wrap) return;
       const dest = wrap.querySelector('.flt-dest').value.trim().toLowerCase();
       const sku = wrap.querySelector('.flt-sku').value.trim().toLowerCase();
+      const skuQ = sinAcentos(sku);
       const tipo = wrap.querySelector('.flt-tipo').value;
       filtrosDetalle.set(wrap.dataset.key, { dest: wrap.querySelector('.flt-dest').value, sku: wrap.querySelector('.flt-sku').value, tipo });
       let vis = 0, uni = 0;
       const filas = wrap.querySelectorAll('tbody tr.fila-det');
       filas.forEach(tr => {
-        const ok = (!dest || tr.dataset.dest.includes(dest)) && (!sku || tr.dataset.sku.includes(sku)) && (!tipo || tr.dataset.tipo === tipo);
+        const ok = (!dest || tr.dataset.dest.includes(dest)) && (!skuQ || tr.dataset.sku.includes(sku) || (tr.dataset.desc || '').includes(skuQ)) && (!tipo || tr.dataset.tipo === tipo);
         tr.style.display = ok ? '' : 'none';
         if (ok) { vis++; if (tr.dataset.rech !== '1') uni += Number(tr.dataset.qty) || 0; }
       });
@@ -1841,6 +1843,32 @@
       if (dashCharts[id]) { dashCharts[id].destroy(); delete dashCharts[id]; }
       const cv = $(id);
       if (!cv || typeof Chart === 'undefined') return;
+      if (typeof ChartDataLabels !== 'undefined') {
+        if (!dashGrafico.reg) { Chart.register(ChartDataLabels); dashGrafico.reg = true; }
+        cfg.options = cfg.options || {};
+        cfg.options.plugins = cfg.options.plugins || {};
+        if (!cfg.options.plugins.datalabels) {
+          const pctEje = !!(cfg.options.scales && cfg.options.scales.y && cfg.options.scales.y.max === 100);
+          const fmt = (v) => Number(v).toLocaleString('es-BO', { maximumFractionDigits: 1 }) + (pctEje ? '%' : '');
+          const apilado = !!(cfg.options.scales && cfg.options.scales.x && cfg.options.scales.x.stacked);
+          cfg.options.plugins.datalabels = {
+            formatter: fmt,
+            display: (ctx) => { const v = Number(ctx.dataset.data[ctx.dataIndex]); return Number.isFinite(v) && v !== 0; },
+            font: { weight: '700', size: 11 },
+            clamp: true,
+            ...(cfg.type === 'doughnut' || apilado
+              ? { color: '#fff', textStrokeColor: 'rgba(0,0,0,.35)', textStrokeWidth: 2 }
+              : cfg.type === 'line'
+                ? { color: '#0b3a5b', anchor: 'end', align: 'top', offset: 4 }
+                : { color: '#0b3a5b', anchor: 'end', align: 'end', offset: 0 })
+          };
+        }
+        if (cfg.type === 'bar' || cfg.type === 'line') {
+          const sc = cfg.options.scales = cfg.options.scales || {};
+          sc.y = sc.y || {};
+          if (sc.y.grace == null) sc.y.grace = '12%';   // espacio para la etiqueta sobre la barra más alta
+        }
+      }
       dashCharts[id] = new Chart(cv, cfg);
     }
     function dashBarras(filas, vacio) {
