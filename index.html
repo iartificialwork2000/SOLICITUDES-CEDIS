@@ -1943,6 +1943,24 @@
     }
 
     // ---- Resumen comparativo por CEDIS (siempre con todos los datos, sin importar el filtro) ----
+    // ---- Horas hábiles del CEDIS: L-V 8:00-16:00, sábados 7:00-13:00, domingos y feriados no cuentan ----
+    const HORARIO_CEDIS = { 1: [8, 16], 2: [8, 16], 3: [8, 16], 4: [8, 16], 5: [8, 16], 6: [7, 13] };   // día de la semana -> [apertura, cierre]
+    function horasHabiles(desde, hasta) {
+      const a = new Date(desde), b = new Date(hasta);
+      if (isNaN(a) || isNaN(b) || b < a) return null;
+      let total = 0;
+      const dia = new Date(a.getFullYear(), a.getMonth(), a.getDate());
+      for (let n = 0; dia <= b && n < 4000; n++, dia.setDate(dia.getDate() + 1)) {
+        const h = HORARIO_CEDIS[dia.getDay()]; if (!h) continue;
+        const ini = new Date(dia.getFullYear(), dia.getMonth(), dia.getDate(), h[0]);
+        const fin = new Date(dia.getFullYear(), dia.getMonth(), dia.getDate(), h[1]);
+        const t = Math.min(fin, b) - Math.max(ini, a);
+        if (t > 0) total += t / 36e5;
+      }
+      return total;
+    }
+    function horasCorridas(desde, hasta) { const h = (new Date(hasta) - new Date(desde)) / 36e5; return Number.isFinite(h) && h >= 0 ? h : null; }
+    const UMBRAL_ABIERTAS_1 = 8, UMBRAL_ABIERTAS_2 = 16;   // 1 y 2 jornadas hábiles (aprox.)
     function cedisDeOrigen(o) { const n = normOrigen(o); return n === '05499' ? 'SCZ' : n === '15497' ? 'LPZ' : 'OTRO'; }
     function dashResumenCedis(datos) {
       const vivos = datos.filter(i => i.estado !== 'ELIMINADO');
@@ -1955,15 +1973,17 @@
         const n = (...e) => gs.filter(g => e.includes(g.estado)).length;
         const pend = n('PENDIENTE'), aprob = n('APROBADO', 'APROBADO CON OBS'), carg = n('CARGADO', 'CARGADO CON OBS'), rech = n('RECHAZADO');
         const resueltas = aprob + carg + rech;
-        const ciclos = gs.filter(g => g.fecha_carga).map(g => hrs(g.created_at, g.fecha_carga)).filter(h => h != null);
+        const ciclos = gs.filter(g => g.fecha_carga).map(g => horasHabiles(g.created_at, g.fecha_carga)).filter(h => h != null);
+        const ciclosCorr = gs.filter(g => g.fecha_carga).map(g => hrs(g.created_at, g.fecha_carga)).filter(h => h != null);
         const abiertas24 = gs.filter(g => g.estado === 'PENDIENTE' || g.estado === 'APROBADO' || g.estado === 'APROBADO CON OBS')
-          .filter(g => { const h = hrs(g.estado === 'PENDIENTE' ? g.created_at : (g.fecha_aprobacion || g.created_at), ahora); return h != null && h > 24; }).length;
+          .filter(g => { const h = hrs(g.estado === 'PENDIENTE' ? g.created_at : (g.fecha_aprobacion || g.created_at), ahora); const hh = horasHabiles(g.estado === 'PENDIENTE' ? g.created_at : (g.fecha_aprobacion || g.created_at), ahora); return hh != null && hh > UMBRAL_ABIERTAS_1; }).length;
         return {
           sol: gs.length, pend, aprob, carg, rech,
           unid: its.reduce((t, i) => t + (Number(i.cantidad) || 0), 0),
           fill: resueltas ? (aprob + carg) / resueltas * 100 : null,
           rechazo: gs.length ? rech / gs.length * 100 : null,
           ciclo: ciclos.length ? ciclos.reduce((t, x) => t + x, 0) / ciclos.length : null,
+          cicloCorr: ciclosCorr.length ? ciclosCorr.reduce((t, x) => t + x, 0) / ciclosCorr.length : null,
           ab24: abiertas24,
           cargObs: n('CARGADO CON OBS'), aprobObs: n('APROBADO CON OBS'),
           porEstado: Object.fromEntries(ESTADOS.map(e => [e, gs.filter(g => g.estado === e).length]))
@@ -1983,8 +2003,8 @@
         ['Unidades', r => r.unid.toLocaleString('es-BO')],
         ['Fill rate', r => r.fill == null ? '—' : fmtPct(r.fill)],
         ['Tasa de rechazo', r => r.rechazo == null ? '—' : fmtPct(r.rechazo)],
-        ['Ciclo total (promedio)', r => fmtH(r.ciclo)],
-        ['Abiertas > 24 h', r => r.ab24]
+        ['Ciclo total (promedio, hábil)', r => fmtH(r.ciclo) + ' <span style="color:#64748b;font-size:11px">(corrido ' + fmtH(r.cicloCorr) + ')</span>'],
+        ['Abiertas > ' + UMBRAL_ABIERTAS_1 + ' h hábiles', r => r.ab24]
       ];
       $('dashResumenCedis').innerHTML =
         '<table class="dash-tabla"><thead><tr><th>Indicador</th>' +
@@ -2131,14 +2151,20 @@
       const ahora = Date.now();
 
       // ===== 1) Tiempos del ciclo (solicitudes aprobadas / cargadas) =====
-      const tAprob = [], tCarga = [], tTotal = [];
+      const tAprob = [], tCarga = [], tTotal = [], cAprob = [], cCarga = [], cTotal = [];   // t* = horas hábiles · c* = horas corridas
       grupos.forEach(g => {
-        const a = g.fecha_aprobacion ? horas(g.created_at, g.fecha_aprobacion) : null;
-        const c = (g.fecha_aprobacion && g.fecha_carga) ? horas(g.fecha_aprobacion, g.fecha_carga) : null;
-        const t = g.fecha_carga ? horas(g.created_at, g.fecha_carga) : null;
+        const a = g.fecha_aprobacion ? horasHabiles(g.created_at, g.fecha_aprobacion) : null;
+        const c = (g.fecha_aprobacion && g.fecha_carga) ? horasHabiles(g.fecha_aprobacion, g.fecha_carga) : null;
+        const t = g.fecha_carga ? horasHabiles(g.created_at, g.fecha_carga) : null;
         if (a != null) tAprob.push(a);
         if (c != null) tCarga.push(c);
         if (t != null) tTotal.push(t);
+        const a2 = g.fecha_aprobacion ? horas(g.created_at, g.fecha_aprobacion) : null;
+        const c2 = (g.fecha_aprobacion && g.fecha_carga) ? horas(g.fecha_aprobacion, g.fecha_carga) : null;
+        const t2 = g.fecha_carga ? horas(g.created_at, g.fecha_carga) : null;
+        if (a2 != null) cAprob.push(a2);
+        if (c2 != null) cCarga.push(c2);
+        if (t2 != null) cTotal.push(t2);
       });
 
       // ===== 2) Pendientes envejecidas =====
@@ -2146,18 +2172,18 @@
         .filter(g => g.estado === 'PENDIENTE' || esAprobado(g.estado))
         .map(g => {
           const desde = esAprobado(g.estado) ? (g.fecha_aprobacion || g.created_at) : g.created_at;
-          return { g, etapa: esAprobado(g.estado) ? 'Sin cargar' : 'Sin aprobar', h: horas(desde, ahora) };
+          return { g, etapa: esAprobado(g.estado) ? 'Sin cargar' : 'Sin aprobar', h: horasHabiles(desde, ahora), hc: horas(desde, ahora) };
         })
         .filter(x => x.h != null)
         .sort((a, b) => b.h - a.h);
-      const mas24 = abiertas.filter(x => x.h > 24).length, mas48 = abiertas.filter(x => x.h > 48).length;
+      const mas24 = abiertas.filter(x => x.h > UMBRAL_ABIERTAS_1).length, mas48 = abiertas.filter(x => x.h > UMBRAL_ABIERTAS_2).length;
 
       $('dashTiempos').innerHTML =
-        tile('Aprobación (promedio)', fmtH(prom(tAprob)), 'c-blue', 'Mediana: ' + fmtH(mediana(tAprob)) + ' · ' + tAprob.length + ' solicitudes') +
-        tile('Carga (promedio)', fmtH(prom(tCarga)), 'c-purple', 'Mediana: ' + fmtH(mediana(tCarga)) + ' · ' + tCarga.length + ' solicitudes') +
-        tile('Ciclo total (promedio)', fmtH(prom(tTotal)), 'c-green', 'Mediana: ' + fmtH(mediana(tTotal)) + ' · ' + tTotal.length + ' solicitudes') +
-        tile('Abiertas > 24 h', mas24, mas24 ? 'c-orange' : 'c-green', 'Pendientes de aprobar o cargar') +
-        tile('Abiertas > 48 h', mas48, mas48 ? 'c-red' : 'c-green', 'Requieren atención');
+        tile('Aprobación · hábil (prom.)', fmtH(prom(tAprob)), 'c-blue', 'Corrido: ' + fmtH(prom(cAprob)) + ' · Mediana hábil: ' + fmtH(mediana(tAprob)) + ' · ' + tAprob.length + ' solicitudes') +
+        tile('Carga · hábil (prom.)', fmtH(prom(tCarga)), 'c-purple', 'Corrido: ' + fmtH(prom(cCarga)) + ' · Mediana hábil: ' + fmtH(mediana(tCarga)) + ' · ' + tCarga.length + ' solicitudes') +
+        tile('Ciclo total · hábil (prom.)', fmtH(prom(tTotal)), 'c-green', 'Corrido: ' + fmtH(prom(cTotal)) + ' · Mediana hábil: ' + fmtH(mediana(tTotal)) + ' · ' + tTotal.length + ' solicitudes') +
+        tile('Abiertas > ' + UMBRAL_ABIERTAS_1 + ' h hábiles', mas24, mas24 ? 'c-orange' : 'c-green', 'Más de 1 jornada sin aprobar o cargar · corrido > 24 h: ' + abiertas.filter(x => x.hc > 24).length) +
+        tile('Abiertas > ' + UMBRAL_ABIERTAS_2 + ' h hábiles', mas48, mas48 ? 'c-red' : 'c-green', 'Más de 2 jornadas · requieren atención · corrido > 48 h: ' + abiertas.filter(x => x.hc > 48).length);
 
       // ===== 3) Calidad: rechazos y cargas con observaciones =====
       const nTot = grupos.length;
