@@ -1115,6 +1115,11 @@
     }
     function nombreDestino(cod) { return (sucursalesMapa && sucursalesMapa.get(String(cod || '').trim())) || ''; }
 
+    // Espera el maestro de SKU (tipo de material y descripción) antes de pintar el detalle; reintenta una vez si falla
+    async function maestroListo() {
+      try { await asegurarMaestro(); }
+      catch (e) { await new Promise(r => setTimeout(r, 1200)); try { await asegurarMaestro(); } catch (e2) { console.warn('Maestro de SKU no disponible:', e2); } }
+    }
     function tipoMaterialDe(sku) {
       const reg = maestroMultiplos && maestroMultiplos.get(String(sku || '').trim());
       return (reg && reg.tipo_material) || '—';
@@ -1749,6 +1754,7 @@
       const anim = animarProx; animarProx = false;
       if (!tbody.querySelector('tr.grp-head')) tbody.innerHTML = '<tr><td colspan="9" class="text-center p-4 txt-carga">Cargando solicitudes...</td></tr>';
       try {
+        await maestroListo();
         const todos = agrupar(await DB.listar('TODOS'));
         renderTilesEstados('tilesSol', todos);
         const grupos = filtrarPorNroNotif(todos);
@@ -1794,6 +1800,7 @@
       const anim = animarProx; animarProx = false;
       if (!tbody.querySelector('tr.grp-head')) tbody.innerHTML = '<tr><td colspan="10" class="text-center p-4 txt-carga">Cargando datos CEDIS...</td></tr>';
       try {
+        await maestroListo();
         let grupos = agrupar(await DB.listar('TODOS'));
         renderTilesEstados('tilesCedis', grupos);
         if (filtroEstado !== 'TODOS') grupos = grupos.filter(g => g.estado === filtroEstado);
