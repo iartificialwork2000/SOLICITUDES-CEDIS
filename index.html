@@ -190,6 +190,8 @@
     .dest-head, .dest-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) 84px 84px 96px; gap: 10px; align-items: center; }
     .dest-head { padding: 0 6px 6px; font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: #64748b; border-bottom: 1px solid #e3eef7; }
     .dest-head span:nth-child(n+3), .dest-row .dest-n { text-align: center; }
+    .lin-grid { grid-template-columns: 24px minmax(0, 1fr) 56px 50px 76px; gap: 8px; }
+    .lin-grid.dest-row { padding: 6px 6px; }
     .dest-row { padding: 9px 6px; border-bottom: 1px solid #edf4fa; }
     .dest-row:nth-child(even) { background: #f8fcff; }
     .dest-pos { text-align: center; font-weight: 800; color: #8aa0b2; }
@@ -675,7 +677,10 @@
             <div class="inner col"><h3 style="margin-bottom:8px">📊 Solicitudes por Área y Estado</h3><div style="height:280px;"><canvas id="chartStackedArea"></canvas></div></div>
             <div class="inner col"><h3 style="margin-bottom:8px">👤 Top Solicitantes</h3><div id="dashTopSolicitantes"></div></div>
           </div>
-          <div class="inner col"><h3 style="margin-bottom:8px">📦 Top 5 SKUs más solicitados</h3><div id="dashSkuContainer"></div></div>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
+            <div class="inner col"><h3 style="margin-bottom:6px;font-size:14px">📦 Top 10 SKUs más solicitados</h3><div id="dashSkuContainer"></div></div>
+            <div class="inner col"><h3 style="margin-bottom:6px;font-size:14px">🏷️ Top 5 líneas que más solicitan <span style="font-size:11px;font-weight:600;color:#64748b">· clic en Solic., Filas o Unidades para ordenar</span></h3><div id="dashLineaContainer"></div></div>
+          </div>
         </div>
       </section>
     </main>
@@ -1075,7 +1080,8 @@
         const mapa = new Map(); const PAG = 1000;
         for (let desde = 0; ; desde += PAG) {
           const consulta = (cols) => sb.from('maestro_multiplos').select(cols).order('id_producto').range(desde, desde + PAG - 1);
-          let { data, error } = await consulta('id_producto,producto,multiplo_scz,multiplo_lpz,tipo_material');
+          let { data, error } = await consulta('id_producto,producto,linea,multiplo_scz,multiplo_lpz,tipo_material');
+          if (error) ({ data, error } = await consulta('id_producto,producto,multiplo_scz,multiplo_lpz,tipo_material'));  // por si aún no existe linea
           if (error) ({ data, error } = await consulta('id_producto,multiplo_scz,multiplo_lpz,tipo_material'));  // por si aún no existe producto
           if (error) ({ data, error } = await consulta('id_producto,multiplo_scz,multiplo_lpz'));  // por si aún no existe tipo_material
           if (error) throw error;
@@ -1127,6 +1133,10 @@
     function nombreSkuDe(sku) {
       const reg = maestroMultiplos && maestroMultiplos.get(String(sku || '').trim());
       return (reg && reg.producto) || '—';
+    }
+    function lineaDe(sku) {
+      const reg = maestroMultiplos && maestroMultiplos.get(String(sku || '').trim());
+      return (reg && String(reg.linea || '').trim()) || '';
     }
     const ORIGENES_VALIDOS = '5499 o 15497';
 
@@ -1995,9 +2005,21 @@
       }
       dashCharts[id] = new Chart(cv, cfg);
     }
-    function dashBarras(filas, vacio) {
+    function dashBarras(filas, vacio, compacto) {
       if (!filas.length) return '<div class="notif-vacio">' + vacio + '</div>';
       const max = Math.max(...filas.map(f => f.valor), 1);
+      if (compacto) {
+        return '<div style="display:flex;flex-direction:column;gap:6px">' + filas.map((f, n) =>
+          '<div style="display:flex;align-items:center;gap:8px">' +
+            '<span style="flex:none;width:16px;text-align:center;font-weight:800;font-size:12px;color:#8aa0b2">' + (n + 1) + '</span>' +
+            '<div style="flex:1;min-width:0">' +
+              '<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;font-weight:700;line-height:1.25">' +
+                '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + f.titulo +
+                  (f.sub ? ' <span style="font-weight:500;font-size:10.5px;color:#64748b">· ' + f.sub + '</span>' : '') + '</span>' +
+                '<span style="flex:none">' + esc(f.texto) + '</span></div>' +
+              '<div style="height:4px;border-radius:999px;background:#e6f4fd;margin-top:2px"><div style="height:4px;border-radius:999px;background:#1cbcec;width:' + Math.max(3, Math.round(f.valor / max * 100)) + '%"></div></div>' +
+            '</div></div>').join('') + '</div>';
+      }
       return '<div style="display:flex;flex-direction:column;gap:10px">' + filas.map((f, n) =>
         '<div style="display:flex;align-items:center;gap:10px">' +
           '<span style="flex:none;width:22px;text-align:center;font-weight:800;color:#8aa0b2">' + (n + 1) + '</span>' +
@@ -2185,7 +2207,7 @@
           .map(([nombre, r]) => ({ titulo: esc(nombre), sub: r.u.toLocaleString('es-BO') + ' unidades', valor: r.n, texto: r.n + (r.n === 1 ? ' solicitud' : ' solicitudes') })),
         'Aún no hay solicitudes.');
 
-      // 5) Top 5 SKUs por unidades
+      // 5) Top 10 SKUs por unidades
       const porSku = new Map();
       items.forEach(i => {
         const k = String(i.sku || '').trim(); if (!k) return;
@@ -2194,13 +2216,26 @@
         porSku.set(k, r);
       });
       $('dashSkuContainer').innerHTML = dashBarras(
-        [...porSku.entries()].sort((a, b) => b[1].u - a[1].u).slice(0, 5)
+        [...porSku.entries()].sort((a, b) => b[1].u - a[1].u).slice(0, 10)
           .map(([sku, r]) => ({
             titulo: '<span class="sku-chip">' + esc(sku) + '</span> ' + esc(nombreSkuDe(sku) === '—' ? '' : nombreSkuDe(sku)),
             sub: 'En ' + r.n.size + (r.n.size === 1 ? ' solicitud' : ' solicitudes'),
             valor: r.u, texto: r.u.toLocaleString('es-BO') + ' u.'
           })),
-        'Aún no hay SKUs solicitados.');
+        'Aún no hay SKUs solicitados.', true);
+
+      // 6) Top 5 líneas (la línea sale de maestro_multiplos); se ordena por solicitudes, filas o unidades
+      const porLinea = new Map();
+      items.forEach(i => {
+        const sku = String(i.sku || '').trim(); if (!sku) return;
+        const k = lineaDe(sku) || 'Sin línea';
+        const r = porLinea.get(k) || { u: 0, f: 0, n: new Set(), skus: new Set() };
+        r.u += Number(i.cantidad) || 0; r.f++; r.skus.add(sku);
+        r.n.add(i.nro_solicitud != null ? i.nro_solicitud : i.solicitud_id);
+        porLinea.set(k, r);
+      });
+      dashLineaData = [...porLinea.entries()].map(([linea, r]) => ({ linea, sol: r.n.size, filas: r.f, u: r.u, skus: r.skus.size }));
+      renderLineas();
 
       try { dashIndicadores(grupos, items, opcionesBase); } catch (e) { console.error('Dashboard (indicadores)', e); }
     }
@@ -2384,6 +2419,26 @@
               '<span class="dest-n' + (campo === 'u' ? ' u' : '') + '">' + r.u.toLocaleString('es-BO') + '</span></div>';
           }).join('')
         : '<div class="notif-vacio">Aún no hay destinos.</div>');
+    }
+
+    // Top 5 líneas: se puede ordenar de mayor a menor por solicitudes, filas o unidades (clic en el encabezado)
+    let dashLineaData = [], dashLineaOrden = 'u';
+    function renderLineas() {
+      const campo = dashLineaOrden;
+      const top = [...dashLineaData].sort((a, b) => b[campo] - a[campo] || b.u - a.u).slice(0, 5);
+      const max = Math.max(...top.map(r => r[campo]), 1);
+      const th = (c, txt) => '<span class="dest-ord' + (campo === c ? ' act' : '') + '" data-orden="' + c + '" role="button" tabindex="0" title="Ordenar de mayor a menor por ' + txt.toLowerCase() + '" style="cursor:pointer;user-select:none' + (campo === c ? ';color:#0b3a5b;font-weight:900' : '') + '">' + txt + (campo === c ? ' ▼' : '') + '</span>';
+      $('dashLineaContainer').innerHTML = top.length
+        ? '<div class="dest-head lin-grid"><span></span><span>Línea</span>' + th('sol', 'Solic.') + th('filas', 'Filas') + th('u', 'Unidades') + '</div>' +
+          top.map((r, n) =>
+            '<div class="dest-row lin-grid"><span class="dest-pos">' + (n + 1) + '</span>' +
+            '<div style="min-width:0"><div class="dest-nom' + (r.linea === 'Sin línea' ? ' sin' : '') + '" title="' + esc(r.linea) + '">' + esc(r.linea) + '</div>' +
+            '<div class="dest-cod">' + r.skus.toLocaleString('es-BO') + (r.skus === 1 ? ' SKU' : ' SKUs') + '</div>' +
+            '<div class="dest-bar"><i style="width:' + Math.max(3, Math.round(r[campo] / max * 100)) + '%"></i></div></div>' +
+            '<span class="dest-n' + (campo === 'sol' ? ' u' : '') + '">' + r.sol.toLocaleString('es-BO') + '</span>' +
+            '<span class="dest-n' + (campo === 'filas' ? ' u' : '') + '">' + r.filas.toLocaleString('es-BO') + '</span>' +
+            '<span class="dest-n' + (campo === 'u' ? ' u' : '') + '">' + r.u.toLocaleString('es-BO') + '</span></div>').join('')
+        : '<div class="notif-vacio">Aún no hay líneas solicitadas.</div>';
     }
 
     // ---- Notificaciones (campana) ----
@@ -2633,6 +2688,13 @@
         if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
         e.preventDefault(); dashDestOrden = t.dataset.orden; renderDestinos();
       };
+      const alOrdenarLineas = (e) => {
+        const t = e.target.closest('[data-orden]'); if (!t) return;
+        if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault(); dashLineaOrden = t.dataset.orden; renderLineas();
+      };
+      $('dashLineaContainer').addEventListener('click', alOrdenarLineas);
+      $('dashLineaContainer').addEventListener('keydown', alOrdenarLineas);
       $('dashDestinos').addEventListener('click', alOrdenarDestinos);
       $('dashDestinos').addEventListener('keydown', alOrdenarDestinos);
       $('notifPanel').addEventListener('click', (e) => {
