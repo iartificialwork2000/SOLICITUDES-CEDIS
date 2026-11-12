@@ -282,6 +282,9 @@
     .det-filtros .flt-det:focus { outline:2px solid #9bd8f3; border-color:#1cbcec; }
     .det-filtros .flt-info { font-size:11.5px; color:#5b7285; padding-bottom:6px; }
     .det-filtros .flt-limpiar { font-size:11.5px; font-weight:700; color:var(--blue); background:none; border:0; cursor:pointer; padding:0 4px 6px; }
+    .det-filtros .btn-exp-det { margin-left:auto; display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:800; color:#fff; background:linear-gradient(135deg,#16a34a,#15803d); border:0; border-radius:8px; padding:7px 12px; cursor:pointer; margin-bottom:0; }
+    .det-filtros .btn-exp-det:hover { filter:brightness(1.08); }
+    .det-filtros .btn-exp-det:disabled { opacity:.6; cursor:wait; }
     .det-table tr.fila-rech td { background:#fff1f2 !important; color:#9f1239; }
     .det-table tr.fila-rech .sku-chip { background:#ffe0e4; color:#be123c; text-decoration:line-through; }
     .det-table tr.fila-rech .qty, .det-table tr.fila-rech td:nth-child(n+5) { text-decoration:line-through; }
@@ -1416,14 +1419,14 @@
     function detalleHTML(g, enPanelCedis) {
       // El rechazo por SKU solo existe en el panel CEDIS; en Mis solicitudes el detalle es de solo lectura
       const conAcc = !!enPanelCedis && puedeRechazarPorSku() && g.items.some(i => i.estado === 'PENDIENTE') && g.items.some(i => i.estado !== 'RECHAZADO');
-      const f = filtrosDetalle.get(g.key) || { dest: '', sku: '', tipo: '' };
+      const f = filtrosDetalle.get(g.key) || { dest: '', sku: '', tipo: '', est: '', ord: '' };
       const tipos = [...new Set(g.items.map(i => tipoMaterialDe(i.sku)))].sort((a, b) => a.localeCompare(b, 'es'));
       const filas = g.items.map((i, n) => {
         const rech = i.estado === 'RECHAZADO' && g.items.some(x => x.estado !== 'RECHAZADO');
         const tipo = tipoMaterialDe(i.sku);
         const puedeRech = conAcc && i.estado === 'PENDIENTE';
         return `
-        <tr class="fila-det ${rech ? 'fila-rech' : ''} ${cantidadAntes(i) != null ? 'fila-mod' : ''}" data-dest="${esc(String(i.destino || '').toLowerCase())}" data-sku="${esc(String(i.sku || '').toLowerCase())}" data-desc="${esc(sinAcentos(nombreSkuDe(i.sku) === '—' ? '' : nombreSkuDe(i.sku)))}" data-tipo="${esc(tipo)}" data-qty="${Number(i.cantidad) || 0}" data-rech="${rech ? 1 : 0}">
+        <tr class="fila-det ${rech ? 'fila-rech' : ''} ${cantidadAntes(i) != null ? 'fila-mod' : ''}" data-dest="${esc(String(i.destino || '').toLowerCase())}" data-sku="${esc(String(i.sku || '').toLowerCase())}" data-desc="${esc(sinAcentos(nombreSkuDe(i.sku) === '—' ? '' : nombreSkuDe(i.sku)))}" data-tipo="${esc(tipo)}" data-qty="${Number(i.cantidad) || 0}" data-rech="${rech ? 1 : 0}" data-pos="${n}" data-id="${esc(i.id)}">
           <td class="pos">${n + 1}</td>
           <td>${esc(i.origen)}</td>
           <td><span class="sku-chip">${esc(i.sku)}</span></td>
@@ -1451,8 +1454,11 @@
             <label>Destino<input type="search" class="flt-det flt-dest" placeholder="Buscar destino..." value="${esc(f.dest)}" autocomplete="off"></label>
             <label>SKU<input type="search" class="flt-det flt-sku" placeholder="Buscar SKU o descripción..." value="${esc(f.sku)}" autocomplete="off"></label>
             <label>Tipo de material<select class="flt-det flt-tipo"><option value="">Todos</option>${tipos.map(t => `<option value="${esc(t)}" ${f.tipo === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
+            <label>Estado del SKU<select class="flt-det flt-est"><option value="" ${!f.est ? 'selected' : ''}>Todos</option><option value="ok" ${f.est === 'ok' ? 'selected' : ''}>Correctos</option><option value="rech" ${f.est === 'rech' ? 'selected' : ''}>Rechazados</option></select></label>
+            <label>Ordenar<select class="flt-det flt-ord"><option value="" ${!f.ord ? 'selected' : ''}>Posición original</option><option value="rech" ${f.ord === 'rech' ? 'selected' : ''}>Rechazados primero</option><option value="ok" ${f.ord === 'ok' ? 'selected' : ''}>Correctos primero</option></select></label>
             <button type="button" class="flt-limpiar">Limpiar filtros</button>
             <span class="flt-info"></span>
+            <button type="button" class="btn-exp-det" data-key="${esc(g.key)}" title="Exportar a Excel lo que se ve en la tabla (incluye el estado de cada SKU)">⬇ Exportar Excel</button>
           </div>
           <div class="det-card">
             <table class="det-table">
@@ -1491,17 +1497,70 @@
       const sku = wrap.querySelector('.flt-sku').value.trim().toLowerCase();
       const skuQ = sinAcentos(sku);
       const tipo = wrap.querySelector('.flt-tipo').value;
-      filtrosDetalle.set(wrap.dataset.key, { dest: wrap.querySelector('.flt-dest').value, sku: wrap.querySelector('.flt-sku').value, tipo });
+      const est = wrap.querySelector('.flt-est').value;
+      const ord = wrap.querySelector('.flt-ord').value;
+      filtrosDetalle.set(wrap.dataset.key, { dest: wrap.querySelector('.flt-dest').value, sku: wrap.querySelector('.flt-sku').value, tipo, est, ord });
       let vis = 0, uni = 0;
       const filas = wrap.querySelectorAll('tbody tr.fila-det');
       filas.forEach(tr => {
-        const ok = (!dest || tr.dataset.dest.includes(dest)) && (!skuQ || tr.dataset.sku.includes(sku) || (tr.dataset.desc || '').includes(skuQ)) && (!tipo || tr.dataset.tipo === tipo);
+        const ok = (!dest || tr.dataset.dest.includes(dest)) && (!skuQ || tr.dataset.sku.includes(sku) || (tr.dataset.desc || '').includes(skuQ)) && (!tipo || tr.dataset.tipo === tipo) && (!est || (est === 'rech') === (tr.dataset.rech === '1'));
         tr.style.display = ok ? '' : 'none';
         if (ok) { vis++; if (tr.dataset.rech !== '1') uni += Number(tr.dataset.qty) || 0; }
       });
-      const hay = !!(dest || sku || tipo);
+      // Orden: rechazados primero / correctos primero / posición original (siempre estable por posición)
+      const tb = wrap.querySelector('tbody');
+      [...filas].sort((a, b) => {
+        if (ord) { const d = (Number(b.dataset.rech) - Number(a.dataset.rech)) * (ord === 'rech' ? 1 : -1); if (d) return d; }
+        return Number(a.dataset.pos) - Number(b.dataset.pos);
+      }).forEach(tr => tb.appendChild(tr));
+      const hay = !!(dest || sku || tipo || est);
       wrap.querySelector('.flt-limpiar').style.display = hay ? '' : 'none';
       wrap.querySelector('.flt-info').textContent = hay ? `Mostrando ${vis} de ${filas.length} filas · ${uni.toLocaleString('es-BO')} unidades` : '';
+    }
+    // Exporta a Excel las filas que se ven en el detalle (respeta filtros y orden), con el estado de cada SKU
+    function cargarSheetJS() {
+      if (window.XLSX) return Promise.resolve(window.XLSX);
+      return new Promise((ok, fail) => {
+        const sc = document.createElement('script');
+        sc.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+        sc.onload = () => window.XLSX ? ok(window.XLSX) : fail(new Error('XLSX no disponible'));
+        sc.onerror = () => fail(new Error('No se pudo cargar la librería de Excel'));
+        document.head.appendChild(sc);
+      });
+    }
+    async function exportarDetalle(btn) {
+      const key = btn.dataset.key;
+      const g = gruposCedis.get(key) || gruposSolicitanteMap.get(key);
+      const wrap = btn.closest('.detail-wrap');
+      if (!g || !wrap) return;
+      const porId = new Map(g.items.map(i => [String(i.id), i]));
+      const head = ['N.º Solicitud', 'Solicitante', 'Área', 'Posición', 'Origen', 'SKU', 'Cantidad', 'Destino', 'Tipo material', 'Nombre SKU', 'Estado SKU', 'Obs. CEDIS'];
+      const filas = [];
+      wrap.querySelectorAll('tbody tr.fila-det').forEach(tr => {
+        if (tr.style.display === 'none') return;
+        const i = porId.get(tr.dataset.id); if (!i) return;
+        const nom = nombreSkuDe(i.sku);
+        filas.push([g.nro, g.solicitante || '', g.area || '', Number(tr.dataset.pos) + 1, i.origen ?? '', String(i.sku ?? ''), Number(i.cantidad) || 0, String(i.destino ?? ''), tipoMaterialDe(i.sku), nom === '—' ? '' : nom, tr.dataset.rech === '1' ? 'RECHAZADO' : 'CORRECTO', g.obs || '']);
+      });
+      if (!filas.length) { alert('No hay filas para exportar con los filtros actuales.'); return; }
+      const nombre = 'Solicitud_' + g.nro + '_detalle_' + new Date().toISOString().slice(0, 10);
+      const txt = btn.textContent; btn.disabled = true; btn.textContent = 'Generando…';
+      try {
+        const X = await cargarSheetJS();
+        const ws = X.utils.aoa_to_sheet([head, ...filas]);
+        ws['!cols'] = [10, 22, 20, 9, 9, 10, 10, 10, 22, 48, 13, 36].map(w => ({ wch: w }));
+        ws['!autofilter'] = { ref: ws['!ref'] };
+        const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, 'Detalle');
+        X.writeFile(wb, nombre + '.xlsx');
+      } catch (err) {
+        // Respaldo: CSV (UTF-8 con BOM, separador ;) si no se pudo cargar la librería
+        const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+        const csv = '\ufeff' + [head, ...filas].map(r => r.map(q).join(';')).join('\r\n');
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+        a.download = nombre + '.csv'; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      } finally { btn.disabled = false; btn.textContent = txt; }
     }
     function aplicarFiltrosGuardados(tbody) {
       tbody.querySelectorAll('.detail-wrap').forEach(aplicarFiltroDetalle);
@@ -1843,10 +1902,12 @@
       if (cancelQty) { const td = cancelQty.closest('td'); cerrarEditorCantidad(td, td.dataset.original, cancelQty.dataset.key, cancelQty.dataset.id); return; }
       const rechSku = e.target.closest('.btn-rech-sku');
       if (rechSku) { rechazarSku(rechSku); return; }
+      const expDet = e.target.closest('.btn-exp-det');
+      if (expDet) { exportarDetalle(expDet); return; }
       const limpiar = e.target.closest('.flt-limpiar');
       if (limpiar) {
         const w = limpiar.closest('.detail-wrap');
-        w.querySelector('.flt-dest').value = ''; w.querySelector('.flt-sku').value = ''; w.querySelector('.flt-tipo').value = '';
+        w.querySelector('.flt-dest').value = ''; w.querySelector('.flt-sku').value = ''; w.querySelector('.flt-tipo').value = ''; w.querySelector('.flt-est').value = ''; w.querySelector('.flt-ord').value = '';
         aplicarFiltroDetalle(w); return;
       }
       const delSol = e.target.closest('.btn-delete-sol');
