@@ -437,6 +437,34 @@
     </div>
   </div>
 
+  <!-- ================= MODAL AVISO DE POSIBLE DUPLICADO ================= -->
+  <div id="modalDuplicado" class="modal-overlay hidden">
+    <div class="modal-card" style="max-width:720px;max-height:90vh;display:flex;flex-direction:column;">
+      <div class="flex items-start gap-3 mb-2">
+        <div style="font-size:28px;line-height:1;">⚠️</div>
+        <div>
+          <h3 class="text-lg font-bold text-slate-800">Posible solicitud duplicada</h3>
+          <p id="dupResumen" class="text-xs text-slate-500 mt-1"></p>
+        </div>
+      </div>
+      <div style="overflow:auto;border:1px solid #e2e8f0;border-radius:10px;" class="mb-3">
+        <table class="w-full text-xs" style="border-collapse:collapse;">
+          <thead style="background:#f1f5f9;position:sticky;top:0;">
+            <tr class="text-left">
+              <th class="p-2">Origen</th><th class="p-2">SKU</th><th class="p-2">Cant.</th><th class="p-2">Destino</th>
+              <th class="p-2">Ya registrada en</th>
+            </tr>
+          </thead>
+          <tbody id="dupCuerpo"></tbody>
+        </table>
+      </div>
+      <div class="flex gap-2">
+        <button type="button" id="btnDupCancelar" class="btn flex-1">Revisar solicitud</button>
+        <button type="button" id="btnDupContinuar" class="btn btn-navy flex-1">Enviar de todos modos</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ================= APLICACIÓN PRINCIPAL ================= -->
   <div id="appContainer" class="hidden">
     <header class="hdr">
@@ -958,6 +986,17 @@
         const { error } = await sb.from('solicitudes').insert(filas);
         if (error) throw error;
       },
+      // Busca filas ya registradas con los mismos SKU (se compara el resto de datos en el cliente).
+      async buscarPorSkus(skus) {
+        const { data, error } = await sb.from('solicitudes')
+          .select('id,nro_solicitud,solicitud_id,sku,origen,destino,cantidad,estado,solicitante,area_origen,created_at')
+          .in('sku', skus)
+          .not('estado', 'in', '(ELIMINADO,RECHAZADO)')
+          .order('created_at', { ascending: false })
+          .limit(1000);
+        if (error) throw error;
+        return data || [];
+      },
       async listar(estado) {
         let q = sb.from('solicitudes').select('*').order('created_at', { ascending: false });
         if (estado && estado !== 'TODOS') q = q.eq('estado', estado);
@@ -1320,6 +1359,55 @@
       }
     }
 
+    // ---------- Aviso de posible solicitud duplicada ----------
+    // Duplicada = misma fila (origen, SKU, cantidad y destino) ya registrada y que sigue vigente:
+    // PENDIENTE / APROBADO, o cargada hace pocos días (las cargadas antiguas ya no cuentan).
+    const DUP_DIAS_CARGADAS = 3;
+    async function buscarDuplicados(datos) {
+      const skus = [...new Set(datos.map(d => d.sku))];
+      const existentes = await DB.buscarPorSkus(skus);
+      const limite = Date.now() - DUP_DIAS_CARGADAS * 86400000;
+      const vigentes = existentes.filter(e => !esCargado(e.estado) || new Date(e.created_at).getTime() >= limite);
+      const clave = (o, s, c, d) => [o, s, Number(c), d].map(x => String(x).trim().toUpperCase()).join('|');
+      const mapa = new Map();
+      vigentes.forEach(e => {
+        const k = clave(e.origen, e.sku, e.cantidad, e.destino);
+        if (!mapa.has(k)) mapa.set(k, []);
+        mapa.get(k).push(e);
+      });
+      const res = [];
+      datos.forEach(d => {
+        const coinc = mapa.get(clave(d.origen, d.sku, d.cantidad, d.destino));
+        if (coinc) res.push({ nueva: d, existentes: coinc });
+      });
+      return res;
+    }
+
+    function confirmarDuplicados(dups, totalFilas) {
+      return new Promise(resolve => {
+        const modal = $('modalDuplicado');
+        $('dupResumen').textContent = `${dups.length} de ${totalFilas} ${totalFilas === 1 ? 'fila coincide' : 'filas coinciden'} con solicitudes ya registradas (mismo origen, SKU, cantidad y destino). ¿Deseas enviarla de todas formas?`;
+        $('dupCuerpo').innerHTML = dups.map(({ nueva, existentes }) => {
+          const e = existentes[0];
+          const f = e.created_at ? new Date(e.created_at).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' }) : '';
+          const mas = existentes.length > 1 ? ` <span class="text-slate-400">(+${existentes.length - 1} más)</span>` : '';
+          return `<tr class="border-t border-slate-200">
+            <td class="p-2">${esc(nueva.origen)}</td><td class="p-2 font-semibold">${esc(nueva.sku)}</td>
+            <td class="p-2">${esc(nueva.cantidad)}</td><td class="p-2">${esc(nueva.destino)}</td>
+            <td class="p-2">N.º <b>${esc(e.nro_solicitud ?? '—')}</b> · ${esc(e.estado)}<br>
+              <span class="text-slate-500">${esc(e.solicitante || '')}${f ? ' · ' + esc(f) : ''}</span>${mas}</td></tr>`;
+        }).join('');
+        const cerrar = (r) => {
+          modal.classList.add('hidden');
+          $('btnDupCancelar').onclick = null; $('btnDupContinuar').onclick = null;
+          resolve(r);
+        };
+        $('btnDupCancelar').onclick = () => cerrar(false);
+        $('btnDupContinuar').onclick = () => cerrar(true);
+        modal.classList.remove('hidden');
+      });
+    }
+
     async function enviarSolicitud(e) {
       e.preventDefault();
       const btn = $('btnSubmit'); const msg = $('mensaje'); msg.classList.add('hidden');
@@ -1357,9 +1445,30 @@
       }
       btn.disabled = true; btn.textContent = 'Enviando...';
       try {
-        const nro = await DB.siguienteNro();
-        datos.forEach(f => { f.nro_solicitud = nro; });
-        await DB.insertar(datos);
+        let nro;
+        // Inserción atómica en la base de datos (verifica duplicados y guarda en la misma operación)
+        let { data: r, error: eRpc } = await sb.rpc('insertar_solicitud', { p_filas: datos, p_forzar: false });
+        if (eRpc && (eRpc.code === 'PGRST202' || /insertar_solicitud/.test(eRpc.message || ''))) {
+          // Respaldo: la función SQL aún no está instalada → verificación en el navegador + insert directo
+          let dups = [];
+          try { dups = await buscarDuplicados(datos); } catch (errDup) { console.warn('No se pudo verificar duplicados:', errDup); }
+          if (dups.length && !(await confirmarDuplicados(dups, datos.length))) { return; }
+          nro = await DB.siguienteNro();
+          datos.forEach(f => { f.nro_solicitud = nro; });
+          await DB.insertar(datos);
+        } else {
+          if (eRpc) throw eRpc;
+          if (!r.ok) {
+            const dups = (r.duplicados || []).map(d => ({
+              nueva: { origen: d.origen, sku: d.sku, cantidad: d.cantidad, destino: d.destino },
+              existentes: d.existentes || []
+            }));
+            if (!(await confirmarDuplicados(dups, datos.length))) { return; }
+            ({ data: r, error: eRpc } = await sb.rpc('insertar_solicitud', { p_filas: datos, p_forzar: true }));
+            if (eRpc) throw eRpc;
+          }
+          nro = r.nro;
+        }
         msg.textContent = `¡Solicitud N.º ${nro} enviada correctamente!`;
         msg.className = 'p-3 rounded text-sm text-center font-semibold bg-green-100 text-green-700 block';
         $('solicitudForm').reset(); limpiarTabla(); aplicarPerfilAlFormulario();
