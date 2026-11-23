@@ -596,7 +596,7 @@
           <span class="step">📋</span>
           <h2>Estado de solicitudes</h2>
           <div class="ctl">
-            <input type="text" id="filtroTextoArea" placeholder="Buscar SKU, solicitante, área..." class="fld" style="width:260px">
+            <input type="text" id="filtroTextoArea" placeholder="Buscar N.º solicitud, solicitante o SKU..." autocomplete="off" class="fld" style="width:260px">
             <button type="button" id="btnActualizarSol" class="btn">Actualizar</button>
           </div>
         </div>
@@ -673,7 +673,7 @@
         <div class="card-b" style="display:flex; flex-direction:column; gap:14px;">
           <div class="dash-sec">🏭 Resumen general por CEDIS</div>
           <div class="inner col" style="overflow-x:auto"><div id="dashResumenCedis"></div></div>
-          <div class="inner col"><h3 style="margin-bottom:8px">Solicitudes por CEDIS y estado</h3><div style="height:240px;"><canvas id="chartCedisEstado"></canvas></div></div>
+          <div class="inner col"><h3 style="margin-bottom:8px">Solicitudes por CEDIS y estado</h3><div style="height:300px;"><canvas id="chartCedisEstado"></canvas></div></div>
 
           <div class="dash-sec" id="dashVista">Vista: general</div>
           <div class="tiles" id="dashTiles"></div>
@@ -1876,11 +1876,20 @@
         await maestroListo();
         const todos = agrupar(await DB.listar('TODOS'));
         renderTilesEstados('tilesSol', todos);
-        const grupos = filtrarPorNroNotif(todos);
+        let grupos = filtrarPorNroNotif(todos);
+        const q = sinAcentos(($('filtroTextoArea') || {}).value || '').trim();
+        if (q) {
+          const qNro = q.replace(/^(n[.º°o]*|nro\.?|#)\s*/, '');
+          grupos = grupos.filter(g =>
+            String(g.nro).toLowerCase() === qNro ||
+            String(g.nro).includes(qNro) && /^\d+$/.test(qNro) ||
+            sinAcentos(g.solicitante).includes(q) ||
+            g.items.some(i => sinAcentos(i.sku).includes(q) || sinAcentos(nombreSkuDe(i.sku) === '—' ? '' : nombreSkuDe(i.sku)).includes(q)));
+        }
         gruposSolicitanteMap = new Map(grupos.map(g => [g.key, g]));
         pintarBannerFiltro(tbody);
         if (!grupos.length) {
-          tbody.innerHTML = '<tr><td colspan="9" class="text-center p-4">' + (filtroNroNotif != null ? 'No se encontró la solicitud N.º ' + esc(filtroNroNotif) + '.' : 'No hay solicitudes.') + '</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="9" class="text-center p-4">' + (filtroNroNotif != null ? 'No se encontró la solicitud N.º ' + esc(filtroNroNotif) + '.' : q ? 'Sin resultados para “' + esc(($('filtroTextoArea').value || '').trim()) + '”.' : 'No hay solicitudes.') + '</td></tr>';
           return;
         }
         renderGrupos(grupos, tbody, false);
@@ -2178,7 +2187,7 @@
           .filter(g => { const h = hrs(g.estado === 'PENDIENTE' ? g.created_at : (g.fecha_aprobacion || g.created_at), ahora); const hh = horasHabiles(g.estado === 'PENDIENTE' ? g.created_at : (g.fecha_aprobacion || g.created_at), ahora); return hh != null && hh > UMBRAL_ABIERTAS_1; }).length;
         return {
           sol: gs.length, pend, aprob, carg, rech,
-          unid: its.reduce((t, i) => t + (Number(i.cantidad) || 0), 0),
+          filasN: its.length,
           fill: resueltas ? (aprob + carg) / resueltas * 100 : null,
           rechazo: gs.length ? rech / gs.length * 100 : null,
           ciclo: ciclos.length ? ciclos.reduce((t, x) => t + x, 0) / ciclos.length : null,
@@ -2199,7 +2208,7 @@
         ['Aprobadas (sin cargar)', r => r.aprob + (r.aprobObs ? ' <span style="color:#64748b;font-size:11px">(' + r.aprobObs + ' con obs.)</span>' : '')],
         ['Cargadas', r => r.carg + (r.cargObs ? ' <span style="color:#64748b;font-size:11px">(' + r.cargObs + ' con obs.)</span>' : '')],
         ['Rechazadas', r => r.rech],
-        ['Unidades', r => r.unid.toLocaleString('es-BO')],
+        ['Filas', r => r.filasN.toLocaleString('es-BO')],
         ['Fill rate', r => r.fill == null ? '—' : fmtPct(r.fill)],
         ['Tasa de rechazo', r => r.rechazo == null ? '—' : fmtPct(r.rechazo)],
         ['Ciclo total (promedio, hábil)', r => fmtH(r.ciclo) + ' <span style="color:#64748b;font-size:11px">(corrido ' + fmtH(r.cicloCorr) + ')</span>'],
@@ -2217,9 +2226,9 @@
         type: 'bar',
         data: {
           labels: cols.map(([k]) => k),
-          datasets: estadosGraf.map(e => ({ label: e, backgroundColor: ESTADO_COLOR[e], data: cols.map(([k]) => res[k].porEstado[e]) }))
+          datasets: estadosGraf.map(e => ({ label: e, backgroundColor: ESTADO_COLOR[e], borderRadius: 4, data: cols.map(([k]) => res[k].porEstado[e]) }))
         },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } } }
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { x: { stacked: false }, y: { stacked: false, beginAtZero: true, ticks: { precision: 0 } } } }
       });
     }
 
@@ -2834,6 +2843,8 @@
       $('btnRefrescarCedis').addEventListener('click', cargarSolicitudesCedis);
       $('filtroEstadoCedis').addEventListener('change', cargarSolicitudesCedis);
       $('btnActualizarSol').addEventListener('click', cargarSolicitudesSolicitante);
+      let tBusqSol = null;
+      $('filtroTextoArea').addEventListener('input', () => { clearTimeout(tBusqSol); tBusqSol = setTimeout(cargarSolicitudesSolicitante, 250); });
 
       ['tablaSolicitantesBody', 'tablaCedisBody'].forEach(id => {
         $(id).addEventListener('click', manejarClickTabla);
