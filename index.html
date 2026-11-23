@@ -984,6 +984,7 @@
       },
       async insertar(filas) {
         const { error } = await sb.from('solicitudes').insert(filas);
+        this.invalidar();
         if (error) throw error;
       },
       // Busca filas ya registradas con los mismos SKU (se compara el resto de datos en el cliente).
@@ -997,20 +998,47 @@
         if (error) throw error;
         return data || [];
       },
-      async listar(estado) {
-        let q = sb.from('solicitudes').select('*').order('created_at', { ascending: false });
-        if (estado && estado !== 'TODOS') q = q.eq('estado', estado);
-        const { data, error } = await q;
-        if (error) throw error;
-        return data || [];
+      // Trae TODAS las filas en páginas de 1000 (Supabase corta en 1000 por consulta) y las guarda unos segundos
+      // para que Mis solicitudes, CEDIS y Dashboard no repitan la misma descarga al cambiar de pestaña.
+      _cache: null, _cachePend: null, CACHE_MS: 30000,
+      invalidar() { this._cache = null; this._cachePend = null; },
+      async _traerTodo(estado) {
+        const PAG = 1000, filas = [], vistos = new Set();
+        for (let desde = 0; desde < 200000; desde += PAG) {
+          // orden estable (fecha + id) para que ninguna fila se repita ni se salte entre páginas
+          let q = sb.from('solicitudes').select('*')
+            .order('created_at', { ascending: false }).order('id', { ascending: false })
+            .range(desde, desde + PAG - 1);
+          if (estado && estado !== 'TODOS') q = q.eq('estado', estado);
+          const { data, error } = await q;
+          if (error) throw error;
+          (data || []).forEach(r => { if (!vistos.has(r.id)) { vistos.add(r.id); filas.push(r); } });
+          if (!data || data.length < PAG) break;
+        }
+        return filas;
+      },
+      async listar(estado, forzar) {
+        if (estado && estado !== 'TODOS') return this._traerTodo(estado);
+        const vigente = this._cache && (Date.now() - this._cache.t) < this.CACHE_MS;
+        if (!forzar && vigente) return this._cache.data.slice();
+        if (!forzar && this._cachePend) return (await this._cachePend).slice();   // misma descarga en curso
+        const pend = this._traerTodo('TODOS');
+        this._cachePend = pend;
+        try {
+          const data = await pend;
+          this._cache = { t: Date.now(), data };
+          return data.slice();
+        } finally { if (this._cachePend === pend) this._cachePend = null; }
       },
       async actualizar(ids, cambios) {
         const { error } = await sb.from('solicitudes').update(cambios).in('id', ids);
+        this.invalidar();
         if (error) throw error;
       },
       // Cambia la cantidad de una sola fila. Verifica que se haya actualizado (si el servidor lo bloquea, no siempre da error).
       async actualizarCantidad(id, cantidad) {
         const { data, error } = await sb.from('solicitudes').update({ cantidad }).eq('id', id).select('id,cantidad');
+        this.invalidar();
         if (error) throw error;
         if (!data || !data.length || Number(data[0].cantidad) !== Number(cantidad)) {
           throw new Error('El servidor no aplicó el cambio: tu perfil no tiene permiso para modificar cantidades en la base de datos.');
@@ -1019,6 +1047,7 @@
       // Rechaza una sola fila (SKU). Verifica que realmente se haya actualizado (si una política lo bloquea, no da error).
       async rechazarItem(id) {
         const { data, error } = await sb.from('solicitudes').update({ estado: 'RECHAZADO' }).eq('id', id).eq('estado', 'PENDIENTE').select('id');
+        this.invalidar();
         if (error) throw error;
         if (!data || !data.length) throw new Error('No se pudo rechazar la fila: ya no está pendiente o tu perfil no tiene permiso en el servidor.');
       },
@@ -1031,6 +1060,7 @@
           .eq('user_id', uid)
           .eq('estado', 'PENDIENTE')
           .select('id');
+        this.invalidar();
         if (error) throw error;
         if (!data || data.length !== ids.length) {
           throw new Error('No se pudo eliminar: la solicitud ya no está pendiente o no te pertenece.');
@@ -2766,6 +2796,7 @@
           (payload) => {
             const n = payload.new;
             if (!n || notifItems.some(x => x.id === n.id)) return;
+            DB.invalidar();   // una notificación nueva implica que una solicitud cambió
             notifItems.unshift(n); notifItems = notifItems.slice(0, 30);
             pintarNotificaciones(); avisoNotificacion(n);
           })
@@ -2799,7 +2830,7 @@
       verificarSesion().then(() => { if (usuarioActual && !puede('crear')) cambiarTab(tabInicial()); });
       $('btnBell').addEventListener('click', (e) => { e.stopPropagation(); abrirNotificaciones(); });
       $('btnNotifTodas').addEventListener('click', marcarTodasLeidas);
-      $('btnActualizarDash').addEventListener('click', () => cargarDashboard());
+      $('btnActualizarDash').addEventListener('click', () => { DB.invalidar(); cargarDashboard(); });
       $('dashFiltroCedis').addEventListener('change', () => cargarDashboard());
       const alOrdenarDestinos = (e) => {
         const t = e.target.closest('[data-orden]'); if (!t) return;
@@ -2840,9 +2871,9 @@
       $('btnAgregarFila').addEventListener('click', () => agregarFilaTabla());
       $('btnLimpiarFilas').addEventListener('click', limpiarTabla);
       $('solicitudForm').addEventListener('submit', enviarSolicitud);
-      $('btnRefrescarCedis').addEventListener('click', cargarSolicitudesCedis);
+      $('btnRefrescarCedis').addEventListener('click', () => { DB.invalidar(); cargarSolicitudesCedis(); });
       $('filtroEstadoCedis').addEventListener('change', cargarSolicitudesCedis);
-      $('btnActualizarSol').addEventListener('click', cargarSolicitudesSolicitante);
+      $('btnActualizarSol').addEventListener('click', () => { DB.invalidar(); cargarSolicitudesSolicitante(); });
       let tBusqSol = null;
       $('filtroTextoArea').addEventListener('input', () => { clearTimeout(tBusqSol); tBusqSol = setTimeout(cargarSolicitudesSolicitante, 250); });
 
